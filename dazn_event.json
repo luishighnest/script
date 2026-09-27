@@ -40,5 +40,16 @@
          "key": "e631288e412b51759b5a1bdc4aff72e8:6b415b9cc7ffe45ca7fc8de712df2165",
          "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
       }
+   ],
+   "International GT Open": [
+      {
+         "name": "Monza Race",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/401ev10dm4bi2lvtcpu5a9fcx_image-header_pIt_1789987146000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2026-09-27T10:13:00Z",
+         "end": "2026-09-27T13:55:00Z",
+         "mpd": "https://dca-ac-live.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvMTNqNHVmejVvMjNkOTEzaTVta3hkY2dobTAiXSwiZXhjIjpbXSwiaGVhZGVycyI6W10sImNvIjp0cnVlLCJpcCI6ZmFsc2UsImFzbiI6WyIxMzMzNSJdLCJzc2lkIjoiYTM1ZDAwZWM5ZTIzIiwiaW50c2lnIjoiU2o3YUY4QnJ6YjJJY08yOGtMSnJXQXA0Ny1fdkpkZGp0TjlsOVcwU3Z3TSIsImlhdCI6MTc5MDUwODQxOCwiZXhwIjoxNzkwNTA4NzE4fQ.k3X460KstzSp6ffe3P6f8tes_98Ze3oMFKTBLdFa-XY/13j4ufz5o23d913i5mkxdcghm0/tv/stream.mpd?channel=7075&outlet=dazn-italy&plang=it",
+         "key": "6cdd146a1357559990345f9527462064:7a3e5ca024a84d516d5c8f1a87e07cf3",
+         "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      }
    ]
 }
