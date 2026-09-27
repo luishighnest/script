@@ -574,9 +574,7 @@ class HeadlessExtractor:
             client = await _get_http_session()
             ua = getattr(client, "_user_agent", None) or "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         
-        # Forza l'uso del JWT di sessione dell'account al posto del CdnToken temporaneo dell'evento
-        # Questo garantisce che l'URL del manifest scada insieme alla sessione di 24 ore anziché in 5 minuti.
-        dazn_token = jwt if jwt else (cdn_value if cdn_value else "")
+        dazn_token = cdn_value if cdn_value else (jwt if jwt else "")
 
         # Itera i PlaybackDetails per trovare la CDN funzionante (evita 401 Forbidden-682 su Akamai)
         client = await _get_http_session()
