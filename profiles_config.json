@@ -6,6 +6,6 @@
     "chrome_profile_path": null
   },
   "mpd": {
-    "chrome_profile_path": "saved_profiles/profile_mpd"
+    "chrome_profile_path": ""
   }
 }
