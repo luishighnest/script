@@ -602,6 +602,7 @@ class HeadlessExtractor:
         chosen_fetch_url = ""
 
         _t = time.time()
+        for cand_pbd in pbd:
             c_mpd = cand_pbd.get("ManifestUrl", "")
             c_la = cand_pbd.get("LaUrl", "")
             c_tok_obj = cand_pbd.get("CdnToken", {}) or {}
