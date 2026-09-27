@@ -41,25 +41,32 @@ link = ""
 For t = 1 To 30
     WScript.Sleep 1000
     If fso.FileExists(logfile) Then
-        Set f = fso.OpenTextFile(logfile, 1)
-        Do Until f.AtEndOfStream
-            line = f.ReadLine
-            p = InStr(line, "https://")
-            If p > 0 Then
-                resto = Mid(line, p)
-                sp = InStr(resto, " ")
-                If sp > 0 Then resto = Left(resto, sp - 1)
-                resto = Replace(resto, """", "")
-                resto = Replace(resto, "|", "")
-                resto = Replace(resto, vbCr, "")
-                resto = Replace(resto, vbLf, "")
-                If InStr(resto, "trycloudflare.com") > 0 Then
-                    link = Trim(resto)
-                    Exit Do
+        On Error Resume Next
+        tmp_copy = logfile & ".tmp"
+        fso.CopyFile logfile, tmp_copy, True
+        If fso.FileExists(tmp_copy) Then
+            Set f = fso.OpenTextFile(tmp_copy, 1)
+            Do Until f.AtEndOfStream
+                line = f.ReadLine
+                p = InStr(line, "https://")
+                If p > 0 Then
+                    resto = Mid(line, p)
+                    sp = InStr(resto, " ")
+                    If sp > 0 Then resto = Left(resto, sp - 1)
+                    resto = Replace(resto, """", "")
+                    resto = Replace(resto, "|", "")
+                    resto = Replace(resto, vbCr, "")
+                    resto = Replace(resto, vbLf, "")
+                    If InStr(resto, "trycloudflare.com") > 0 Then
+                        link = Trim(resto)
+                        Exit Do
+                    End If
                 End If
-            End If
-        Loop
-        f.Close
+            Loop
+            f.Close
+            fso.DeleteFile tmp_copy, True
+        End If
+        On Error GoTo 0
         If link <> "" Then Exit For
     End If
 Next
