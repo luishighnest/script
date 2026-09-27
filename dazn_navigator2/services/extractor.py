@@ -483,8 +483,8 @@ class HeadlessExtractor:
         _t = time.time()
         sid = f"{int(time.time()*1000)}-{dev_id}-{asset_id}-{_uuid.uuid4().hex[:8].upper()}"
         pb_url = (f"{playback_svc}?AppVersion=2.85.0&DrmType=WIDEVINE&Format=MPEG-DASH"
-                  f"&PlayerId=%40dazn%2Fpeng-html5-core%2Flg%2Flg&Platform=tv&Model=webOS"
-                  f"&Secure=true&Manufacturer=LG&PlayReadyInitiator=false&Capabilities=hcst%2Cmta"
+                  f"&PlayerId=%40dazn%2Fpeng-html5-core%2Fweb%2Fweb&Platform=web&Model=Desktop"
+                  f"&Secure=true&Manufacturer=Web&PlayReadyInitiator=false&Capabilities=hcst%2Cmta"
                   f"&AssetId={asset_id}&LanguageCode=it&country=it&CountryCode=it")
 
         web_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -574,8 +574,9 @@ class HeadlessExtractor:
             client = await _get_http_session()
             ua = getattr(client, "_user_agent", None) or "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         
-        self.result["ua"] = ua
-        dazn_token = cdn_value if cdn_value else jwt
+        # Forza l'uso del JWT di sessione dell'account al posto del CdnToken temporaneo dell'evento
+        # Questo garantisce che l'URL del manifest scada insieme alla sessione di 24 ore anziché in 5 minuti.
+        dazn_token = jwt if jwt else (cdn_value if cdn_value else "")
 
         # Itera i PlaybackDetails per trovare la CDN funzionante (evita 401 Forbidden-682 su Akamai)
         client = await _get_http_session()
