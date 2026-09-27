@@ -1,6 +1,6 @@
-2026/09/27-19:16:17.049 3f0 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/09/27-19:16:17.189 3f0 Recovering log #37
-2026/09/27-19:16:17.193 3f0 Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/000037.log 
-2026/09/27-19:16:23.876 372c Level-0 table #41: started
-2026/09/27-19:16:23.890 372c Level-0 table #41: 683376 bytes OK
-2026/09/27-19:16:23.894 372c Delete type=0 #37
+2026/09/27-19:22:24.458 1ce0 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/09/27-19:22:24.467 1ce0 Recovering log #40
+2026/09/27-19:22:24.478 1ce0 Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/000040.log 
+2026/09/27-19:22:33.560 2174 Level-0 table #44: started
+2026/09/27-19:22:33.568 2174 Level-0 table #44: 683376 bytes OK
+2026/09/27-19:22:33.571 2174 Delete type=0 #40
