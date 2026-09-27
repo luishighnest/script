@@ -483,19 +483,18 @@ class HeadlessExtractor:
         _t = time.time()
         sid = f"{int(time.time()*1000)}-{dev_id}-{asset_id}-{_uuid.uuid4().hex[:8].upper()}"
         pb_url = (f"{playback_svc}?AppVersion=0.149.9&DrmType=WIDEVINE&Format=MPEG-DASH"
-                  f"&PlayerId=%40dazn%2Fpeng-html5-core%2Flg%2Flg&Platform=lg&Model=OLED65CX6LA"
-                  f"&Secure=true&Manufacturer=lg&PlayReadyInitiator=false&Capabilities=hcst%2Cmta"
+                  f"&PlayerId={player_id_param}&Platform={platform_param}&Model={model_param}"
+                  f"&Secure=true&Manufacturer={mfr_param}&PlayReadyInitiator=false&Capabilities=hcst%2Cmta"
                   f"&AssetId={asset_id}&LanguageCode=it&country=it&CountryCode=it")
 
-        lg_ua = "Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
-
+        web_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
         if page:
             r_main_req = await page.request.get(pb_url, headers={
                 "authorization": f"Bearer {jwt}",
                 "dazn-token": jwt,
                 "x-dazn-device": dev_id,
-                "user-agent": lg_ua
+                "user-agent": web_ua
             })
             pb_r = {"ok": r_main_req.ok, "status": r_main_req.status, "body": await r_main_req.text()}
 
