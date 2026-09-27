@@ -490,21 +490,13 @@ class HeadlessExtractor:
         web_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
         if page:
-            pb_r = await page.evaluate(
-                """async ({url, jwt, devId}) => {
-                    try {
-                        const r = await fetch(url, {
-                            headers: {
-                                "authorization": "Bearer " + jwt,
-                                "dazn-token": jwt,
-                                "x-dazn-device": devId
-                            }
-                        });
-                        return { ok: r.ok, status: r.status, body: await r.text() };
-                    } catch(e) { return { ok: false, error: e.message }; }
-                }""",
-                {"url": pb_url, "jwt": jwt, "devId": dev_id}
-            )
+            r_main_req = await page.request.get(pb_url, headers={
+                "authorization": f"Bearer {jwt}",
+                "dazn-token": jwt,
+                "x-dazn-device": dev_id,
+                "user-agent": web_ua
+            })
+            pb_r = {"ok": r_main_req.ok, "status": r_main_req.status, "body": await r_main_req.text()}
         else:
             pb_r = await self._chiama_api(pb_url, jwt, page=page)
 
