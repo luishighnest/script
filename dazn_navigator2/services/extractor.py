@@ -613,17 +613,17 @@ class HeadlessExtractor:
             if not c_mpd or not c_la:
                 continue
 
-            c_tok = c_val if c_val else jwt
+            c_tok = jwt if (jwt and jwt.startswith("eyJ")) else c_val
             c_fetch_url = c_mpd
-            if c_val:
-                if c_val.startswith("eyJ") and "/@" not in c_fetch_url:
+            if c_tok:
+                if c_tok.startswith("eyJ") and "/@" not in c_fetch_url:
                     if "://" in c_fetch_url:
                         proto, rest = c_fetch_url.split("://", 1)
                         if "/" in rest:
                             host, path = rest.split("/", 1)
-                            c_fetch_url = f"{proto}://{host}/@{c_val}/{path}"
+                            c_fetch_url = f"{proto}://{host}/@{c_tok}/{path}"
                         else:
-                            c_fetch_url = f"{proto}://{rest}/@{c_val}"
+                            c_fetch_url = f"{proto}://{rest}/@{c_tok}"
                 else:
                     sep = "&" if "?" in c_fetch_url else "?"
                     c_fetch_url = f"{c_fetch_url}{sep}{c_name}={c_val}"
