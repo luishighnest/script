@@ -5,7 +5,7 @@ On Error Resume Next
 ' ==============================================================================
 
 base    = "C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\"
-py      = "C:\Users\alecl\AppData\Local\Programs\Python\Python313\python.exe"
+py      = "C:\Users\alecl\AppData\Local\Programs\Python\Python313\pythonw.exe"
 cf      = "C:\Users\alecl\AppData\Local\Temp\opencode\cloudflared.exe"
 logfile = "C:\Users\alecl\AppData\Local\Temp\opencode\cf_bat.log"
 
