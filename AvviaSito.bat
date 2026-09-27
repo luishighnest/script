@@ -35,7 +35,7 @@ if not exist "%CF%" (
     pause
     exit /b 1
 )
-start "Script2 - Tunnel" /min "%CF%" tunnel --url http://127.0.0.1:5000 --no-autoupdate --logfile "%CFLOG%" --loglevel info
+start "Script2 - Tunnel" /min "%CF%" tunnel --edge-ip-version 4 --protocol http2 --url http://127.0.0.1:5000 --no-autoupdate --logfile "%CFLOG%" --loglevel info
 
 echo [4/4] Attendo generazione del link Cloudflare e aggiorno GitHub...
 set "PUBLIC="
