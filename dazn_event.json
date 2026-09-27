@@ -1,15 +1,4 @@
 {
-   "Saint-Tropez Open": [
-      {
-         "name": "Saint Tropez Open | Giorno 6",
-         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/7lqoimqal34torofkrzeq5gzx_image-header_pIt_1789396457000/fill/none/top/none/100/1280/720/png/image",
-         "start": "2026-09-26T09:30:00Z",
-         "end": "2026-09-26T18:00:00Z",
-         "mpd": "https://dca-de-livedazn.daznedge.net/1n1ofrh0aiitj13vv0oe9390mz/tv/stream.mpd?channel=5073&outlet=dazn-italy&plang=it&dazn-token=tend:1790531065~proto:dash~geo:IT~asn:13335~path:1_1_bdafee1892080c305b4ba28b4df427f8504bc92b885355ad13fca7aae81d9b5e~id:a35d00ec9e23~tk3:c6e941fe69329f180b7d4f052819991608ccde3de459f928dfa4e218a0ba2a0c",
-         "key": "4f609830e09e566ab48bbb20f4b50cc9:a303cb2dfff61fad95b8b7d22c438433",
-         "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-      }
-   ],
    "Live TV": [
       {
          "name": "DAZN 1",
