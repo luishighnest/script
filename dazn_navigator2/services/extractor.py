@@ -484,21 +484,12 @@ class HeadlessExtractor:
         sid = f"{int(time.time()*1000)}-{dev_id}-{asset_id}-{_uuid.uuid4().hex[:8].upper()}"
         pb_url = (f"{playback_svc}?AppVersion=2.85.0&DrmType=WIDEVINE&Format=MPEG-DASH"
                   f"&PlayerId=%40dazn%2Fpeng-html5-core%2Fweb%2Fweb&Platform=web&Model=Desktop"
-                  f"&Secure=true&Manufacturer=Web&Capabilities=hcst%2Cmta"
+                  f"&Secure=true&Manufacturer=Web&PlayReadyInitiator=false&Capabilities=hcst%2Cmta"
                   f"&AssetId={asset_id}&LanguageCode=it&country=it&CountryCode=it")
 
         web_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
-        if page:
-            r_main_req = await page.request.get(pb_url, headers={
-                "authorization": f"Bearer {jwt}",
-                "dazn-token": jwt,
-                "x-dazn-device": dev_id,
-                "user-agent": web_ua
-            })
-            pb_r = {"ok": r_main_req.ok, "status": r_main_req.status, "body": await r_main_req.text()}
-        else:
-            pb_r = await self._chiama_api(pb_url, jwt, page=page)
+        pb_r = await self._chiama_api(pb_url, jwt, page=page)
 
         console.print(f"[dim]  -> 3. Playback API: {time.time() - _t:.2f}s[/dim]")
 
