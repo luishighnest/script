@@ -602,22 +602,26 @@ class HeadlessExtractor:
         chosen_fetch_url = ""
 
         _t = time.time()
-        for cand_pbd in pbd:
             c_mpd = cand_pbd.get("ManifestUrl", "")
             c_la = cand_pbd.get("LaUrl", "")
             c_tok_obj = cand_pbd.get("CdnToken", {}) or {}
-            c_name = c_tok_obj.get("Name", "")
+            c_name = c_tok_obj.get("Name", "") or "dazn-token"
             c_val = c_tok_obj.get("Value", "")
-            c_tok = c_val if c_val else jwt
 
             if not c_mpd or not c_la:
                 continue
 
-            token_for_url = jwt if (jwt and jwt.startswith("eyJ")) else c_val
+            import re
+            if jwt and jwt.startswith("eyJ"):
+                c_mpd = re.sub(r'/(?:@|%40)eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/', f'/@{jwt}/', c_mpd)
+                c_tok = jwt
+            else:
+                c_tok = c_val if c_val else jwt
+
             c_fetch_url = c_mpd
-            if token_for_url:
+            if c_tok:
                 sep = "&" if "?" in c_fetch_url else "?"
-                c_fetch_url = f"{c_fetch_url}{sep}{c_name}={token_for_url}"
+                c_fetch_url = f"{c_fetch_url}{sep}{c_name}={c_tok}"
 
             c_hdrs = {
                 "origin": "https://www.dazn.com",
