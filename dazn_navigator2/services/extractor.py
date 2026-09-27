@@ -681,7 +681,7 @@ class HeadlessExtractor:
 
         mpd_url_original = chosen_mpd_url
         la_url = chosen_la_url
-        dazn_token = chosen_token
+        dazn_token = jwt if jwt and jwt.startswith("eyJ") else chosen_token
         cdn_name = chosen_cdn_name
         fetch_mpd_url = chosen_fetch_url
         self.result["mpd_url"] = mpd_url_original
@@ -871,7 +871,7 @@ class HeadlessExtractor:
         self.result["kodi_url"] = f"{fetch_mpd_url}&ck={ck}&headers={hdrs_b64}"
 
         self.result["dazn_token"] = dazn_token
-
+        self.result["jwt"] = jwt
         self.result["cdn_name"] = cdn_name
 
         self.result["ok"] = True

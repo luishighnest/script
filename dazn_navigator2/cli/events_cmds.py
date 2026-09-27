@@ -208,10 +208,10 @@ def _build_entry(tile: ContentTile, result: dict):
     logo = _image_url(tile.image)
 
     keys_str = ','.join(result.get('keys', []))
-    dazn_token = result.get('dazn_token', '')
+    dazn_token = result.get('jwt') or result.get('dazn_token', '')
     mpd_url = result['mpd_url']
     
-    # Inserimento token nel path (@token/...) come richiesto dall'addon
+    # Inserimento token nel path (@token/...) come richiesto per durata 24 ore
     if dazn_token:
         if "://" in mpd_url:
             proto, rest = mpd_url.split("://", 1)
