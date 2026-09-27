@@ -404,7 +404,13 @@
                         <i class="fa-solid fa-circle-xmark text-danger me-1" id="profile-status-icon"></i> <span id="profile-status-label">Profilo non attivo:</span> <code id="active-profile-path" class="text-secondary">{{ chrome_profile_path }}</code>
                     {% endif %}
                 </small>
-                <div class="d-flex gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span id="session-timer-badge" class="badge bg-dark border border-secondary text-light py-1 px-2 font-monospace" style="font-size: 0.82rem; display: none;">
+                        <i class="fa-solid fa-clock text-warning me-1"></i>Scadenza DAZN: <span id="session-timer-text">--:--:--</span>
+                    </span>
+                    <button class="btn btn-sm btn-outline-warning py-0 px-2" onclick="manualRefreshDaznSession()" id="btn-refresh-session" title="Forza il rinnovo immediato del token di sessione DAZN">
+                        <i class="fa-solid fa-arrows-rotate me-1"></i>Aggiorna Sessione DAZN
+                    </button>
                     <button class="btn btn-sm btn-outline-mini py-0 px-2" onclick="showZipSetup()">Carica file JSON</button>
                     <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteProfileSession()" title="Elimina la sessione JSON salvata per questo profilo">
                         <i class="fa-solid fa-trash me-1"></i>Elimina Sessione
@@ -1335,11 +1341,78 @@ function showCopyToast(msg, isError) {
 
         window.__extractedEntries = [];
 
-        function refreshData() {
-            loadExtracted();
+        let sessionExpTimestamp = null;
+
+        async function updateSessionTimer() {
+            try {
+                const res = await fetch('/api/session-status');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.ok && data.has_token && data.exp) {
+                        sessionExpTimestamp = data.exp;
+                        document.getElementById('session-timer-badge').style.display = 'inline-block';
+                    } else {
+                        document.getElementById('session-timer-badge').style.display = 'none';
+                    }
+                }
+            } catch (e) {
+                console.error("Errore fetch session-status:", e);
+            }
+        }
+
+        function tickSessionTimer() {
+            if (!sessionExpTimestamp) return;
+            const now = Math.floor(Date.now() / 1000);
+            const remaining = sessionExpTimestamp - now;
+            const timerTextElem = document.getElementById('session-timer-text');
+
+            if (remaining <= 0) {
+                timerTextElem.innerText = "SCADUTO";
+                timerTextElem.className = "text-danger fw-bold";
+                return;
+            }
+
+            const h = Math.floor(remaining / 3600);
+            const m = Math.floor((remaining % 3600) / 60);
+            const s = remaining % 60;
+            const formatted = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            
+            timerTextElem.innerText = formatted;
+            if (remaining < 1800) {
+                timerTextElem.className = "text-danger fw-bold";
+            } else if (remaining < 7200) {
+                timerTextElem.className = "text-warning fw-bold";
+            } else {
+                timerTextElem.className = "text-success fw-bold";
+            }
+        }
+
+        async function manualRefreshDaznSession() {
+            const btn = document.getElementById('btn-refresh-session');
+            const origHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Rinnovo in corso...';
+            try {
+                const res = await fetch('/api/refresh-dazn-session', { method: 'POST' });
+                const data = await res.json();
+                if (data.ok) {
+                    showCopyToast('Sessione DAZN rinnovata con successo!', false);
+                    await updateSessionTimer();
+                } else {
+                    showCopyToast('Errore rinnovo sessione: ' + (data.error || 'sconosciuto'), true);
+                }
+            } catch (e) {
+                showCopyToast('Errore di connessione durante il rinnovo', true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = origHTML;
+            }
         }
 
         init();
+        updateSessionTimer();
+        setInterval(tickSessionTimer, 1000);
+        setInterval(updateSessionTimer, 30000);
     </script>
 </body>
 </html>

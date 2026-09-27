@@ -499,6 +499,59 @@ def _background_dazn_refresher():
 _refresher_thread = threading.Thread(target=_background_dazn_refresher, daemon=True)
 _refresher_thread.start()
 
+@app.route("/api/session-status", methods=["GET"])
+def api_session_status():
+    """Restituisce lo stato e la scadenza (exp) del token JWT DAZN del profilo attivo."""
+    if "user_profile_id" not in session:
+        return jsonify({"ok": False, "error": "Non autenticato"}), 401
+
+    pid = _current_pid()
+    profile_dir = Path(get_active_chrome_profile(pid))
+    session_file = profile_dir / "dazn_session.json"
+    auth_file = profile_dir / "auth_token.json"
+
+    jwt_token = ""
+    if session_file.exists():
+        try:
+            sdata = json.loads(session_file.read_text(encoding="utf-8"))
+            jwt_token = sdata.get("jwt", "")
+        except Exception:
+            pass
+
+    if not jwt_token and auth_file.exists():
+        try:
+            adata = json.loads(auth_file.read_text(encoding="utf-8"))
+            jwt_token = adata.get("jwt", "")
+        except Exception:
+            pass
+
+    if not jwt_token or not jwt_token.startswith("eyJ"):
+        return jsonify({"ok": False, "has_token": False, "exp": None, "remaining": 0})
+
+    try:
+        import base64
+        parts = jwt_token.split(".")
+        if len(parts) >= 2:
+            payload_b64 = parts[1]
+            # Fix base64 padding
+            payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+            payload_bytes = base64.b64decode(payload_b64)
+            payload = json.loads(payload_bytes.decode("utf-8"))
+            exp = payload.get("exp")
+            if exp:
+                remaining = max(0, int(exp - time.time()))
+                return jsonify({
+                    "ok": True,
+                    "has_token": True,
+                    "exp": exp,
+                    "remaining": remaining,
+                    "profile": pid
+                })
+    except Exception as e:
+        print(f"[Session Status Error] {e}")
+
+    return jsonify({"ok": True, "has_token": True, "exp": None, "remaining": None, "profile": pid})
+
 @app.route("/api/refresh-dazn-session", methods=["POST"])
 def api_refresh_dazn_session():
     """Endpoint per sollecitare il rinnovo manuale o via cron/webhook della sessione DAZN."""
