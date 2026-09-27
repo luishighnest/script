@@ -14,29 +14,16 @@ Set sh  = CreateObject("WScript.Shell")
 Set wmi = GetObject("winmgmts:\\.\root\cimv2")
 
 ' 1) TERMINAZIONE PULITA DI TUTTI I PROCESSI PRECEDENTI
-' Termina qualsiasi istanza precedente di cloudflared
-For Each proc In wmi.ExecQuery("Select * from Win32_Process Where Name = 'cloudflared.exe'")
-    proc.Terminate()
-Next
-
-' Termina processi python che eseguono app.py o script2
-For Each proc In wmi.ExecQuery("Select * from Win32_Process Where Name = 'python.exe' or Name = 'pythonw.exe'")
-    cmdLine = LCase(proc.CommandLine)
-    If InStr(cmdLine, "app.py") > 0 Or InStr(cmdLine, "script2") > 0 Then
-        proc.Terminate()
-    End If
-Next
-
-' Libera la porta 5000 se ancora occupata
+sh.Run "taskkill /f /im cloudflared.exe", 0, True
+sh.Run "taskkill /f /im pythonw.exe /im python.exe", 0, True
 sh.Run "cmd /c ""for /f ""tokens=5"" %a in ('netstat -aon ^| findstr "":5000"" ^| findstr ""LISTENING""') do taskkill /f /pid %a""", 0, True
-
-' Breve pausa per rilascio socket e file lock
-WScript.Sleep 1500
+WScript.Sleep 1000
 
 ' 2) Pulizia log precedente del tunnel
 If fso.FileExists(logfile) Then
-    Err.Clear
+    On Error Resume Next
     fso.DeleteFile logfile, True
+    On Error GoTo 0
 End If
 
 ' 3) Avvio Flask nascosto su localhost
@@ -79,7 +66,7 @@ Next
 
 ' 6) Aggiorna il redirect su GitHub Pages se il link è valido
 If link <> "" Then
-    sh.Run """" & py & """ update_redirect.py """ & link & """", 0, True
+    sh.Run """" & py & """ """ & base & "update_redirect.py"" """ & link & """", 0, True
     ' Notifica informativa non bloccante (scompare da sola dopo 4 secondi)
     sh.Popup "Script2 avviato con successo!" & vbCrLf & vbCrLf & _
              "Link fisso: https://luishighnest.github.io/script2/" & vbCrLf & _

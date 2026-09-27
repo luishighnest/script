@@ -9,6 +9,20 @@ BASE_DIR = Path(__file__).resolve().parent
 INDEX = BASE_DIR / "index.html"
 TOKEN_FILE = BASE_DIR / "github_token.txt"
 
+# Protezione per esecuzione con pythonw.exe (senza console/stdout)
+if sys.stdout is None:
+    try:
+        sys.stdout = open(BASE_DIR / "redirect.log", "a", encoding="utf-8", buffering=1)
+    except Exception:
+        import io
+        sys.stdout = io.StringIO()
+if sys.stderr is None:
+    try:
+        sys.stderr = open(BASE_DIR / "redirect.log", "a", encoding="utf-8", buffering=1)
+    except Exception:
+        import io
+        sys.stderr = io.StringIO()
+
 TEMPLATE = """<!DOCTYPE html>
 <html lang="it">
 <head>
