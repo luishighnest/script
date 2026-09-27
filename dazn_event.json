@@ -19,6 +19,15 @@
          "mpd": "https://dct-ac-live.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvZGFzaC9kYXpuLWxpbmVhci0yMDYiXSwiZXhjIjpbXSwiaGVhZGVycyI6W10sImNvIjp0cnVlLCJpcCI6ZmFsc2UsImFzbiI6WyIxMzMzNSJdLCJzc2lkIjoiYTM1ZDAwZWM5ZTIzIiwiaW50c2lnIjoiU2o3YUY4QnJ6YjJJY08yOGtMSnJXQXA0Ny1fdkpkZGp0TjlsOVcwU3Z3TSIsImlhdCI6MTc5MDUwNzg4MCwiZXhwIjoxNzkwNTk0MjgwfQ.JLGdT_jYRVcoND7KItvbUdssRlmbxJUHOygzNlXOCII/dash/dazn-linear-206/stream.mpd?p=tv",
          "key": "6164a0abaa7c53c6875fa1e7fe0bb463:271510d3e1259571dcc568a232e397eb",
          "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      },
+      {
+         "name": "Eurosport 1",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/16i99sm3aq9cg1lmga260qy67y_image-header_pIt_1661948765000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2024-05-23T10:00:00Z",
+         "end": "3000-01-01T00:00:00Z",
+         "mpd": "https://dct-ac-live.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvZGFzaC9kYXpuLWxpbmVhci0yMTEiXSwiZXhjIjpbXSwiaGVhZGVycyI6W10sImNvIjp0cnVlLCJpcCI6ZmFsc2UsImFzbiI6WyIxMzMzNSJdLCJzc2lkIjoiYTM1ZDAwZWM5ZTIzIiwiaW50c2lnIjoiU2o3YUY4QnJ6YjJJY08yOGtMSnJXQXA0Ny1fdkpkZGp0TjlsOVcwU3Z3TSIsImlhdCI6MTc5MDUwNzkyMCwiZXhwIjoxNzkwNTA4MjIwfQ.uNJusbTzjpY_O4ArDHREynGz7BKoHZggqPajamBlqpM/dash/dazn-linear-211/stream.mpd?p=tv",
+         "key": "5b95fea44d1458128174961a2f43244c:8eac54008e5cb7e3751156ad53ca5625",
+         "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
       }
    ]
 }
