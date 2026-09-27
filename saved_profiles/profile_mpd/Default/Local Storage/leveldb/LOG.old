@@ -1,3 +1,6 @@
-2026/09/27-14:58:36.484 39a0 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Local Storage\leveldb/MANIFEST-000001
-2026/09/27-14:58:36.592 39a0 Recovering log #4
-2026/09/27-14:58:36.749 39a0 Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Local Storage\leveldb/000004.log 
+2026/09/27-15:06:12.794 3fac Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Local Storage\leveldb/MANIFEST-000001
+2026/09/27-15:06:12.907 3fac Recovering log #4
+2026/09/27-15:06:12.921 3fac Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Local Storage\leveldb/000004.log 
+2026/09/27-15:28:07.747 1758 Level-0 table #7: started
+2026/09/27-15:28:07.779 1758 Level-0 table #7: 20766 bytes OK
+2026/09/27-15:28:07.790 1758 Delete type=0 #4

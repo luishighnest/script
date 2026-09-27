@@ -1,6 +1,10 @@
-2026/09/27-14:59:11.376 3aa4 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/09/27-14:59:11.381 3aa4 Recovering log #14
-2026/09/27-14:59:11.382 3aa4 Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/000014.log 
-2026/09/27-14:59:12.212 1798 Level-0 table #18: started
-2026/09/27-14:59:12.220 1798 Level-0 table #18: 683376 bytes OK
-2026/09/27-14:59:12.227 1798 Delete type=0 #14
+2026/09/27-15:06:53.380 794 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/09/27-15:06:53.387 794 Recovering log #17
+2026/09/27-15:06:53.400 794 Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/000017.log 
+2026/09/27-15:06:54.397 30d0 Level-0 table #21: started
+2026/09/27-15:06:54.405 30d0 Level-0 table #21: 683376 bytes OK
+2026/09/27-15:06:54.409 30d0 Delete type=0 #17
+2026/09/27-15:06:54.414 33b8 Compacting 4@0 + 1@1 files
+2026/09/27-15:06:54.439 33b8 Generated table #22@0: 3 keys, 683376 bytes
+2026/09/27-15:06:54.439 33b8 Compacted 4@0 + 1@1 files => 683376 bytes
+2026/09/27-15:06:54.440 33b8 compacted to: files[ 0 1 1 0 0 0 0 ]
