@@ -868,9 +868,18 @@ class HeadlessExtractor:
             f"{ext_mpd}&ck={urllib.parse.quote(ck)}&headers={urllib.parse.quote(hdrs_b64)}"
         )
 
+        # Assicura che la property mpd (usata da Upstash/JSON finale) usi il JWT a 24h
+        if jwt and jwt.startswith("eyJ"):
+            import re
+            mpd_24h = ext_mpd
+            mpd_24h = re.sub(r'dazn-token=eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+', f'dazn-token={jwt}', mpd_24h)
+            self.result["mpd"] = mpd_24h
+        else:
+            self.result["mpd"] = ext_mpd
+
         self.result["kodi_url"] = f"{fetch_mpd_url}&ck={ck}&headers={hdrs_b64}"
 
-        self.result["dazn_token"] = dazn_token
+        self.result["dazn_token"] = jwt if (jwt and jwt.startswith("eyJ")) else dazn_token
         self.result["jwt"] = jwt
         self.result["cdn_name"] = cdn_name
 
