@@ -249,19 +249,20 @@ class HeadlessExtractor:
                         f"scade tra {int(pl.get('exp', 0) - time.time())}s)[/dim]"
                     )
 
-        if jwt and b and b.page:
+        if jwt:
             try:
-                res_ref = await b.page.request.post(
+                client = await _get_http_session()
+                res_ref = await client.post(
                     "https://ott-authz-bff-prod.ar.indazn.com/v5/RefreshAccessToken",
-                    headers={"authorization": f"Bearer {jwt}", "content-type": "application/json"}
+                    headers={"authorization": f"Bearer {jwt}", "content-type": "application/json"},
+                    timeout=10
                 )
-                if res_ref.ok:
-                    ref_json = await res_ref.json()
+                if res_ref.status_code == 200:
+                    ref_json = res_ref.json()
                     tok_fresh = ref_json.get("AuthToken", {}).get("Token")
-                    if tok_fresh:
+                    if tok_fresh and tok_fresh.startswith("eyJ"):
                         jwt = tok_fresh
-                        console.print("[dim]  -> Token DAZN rigenerato via RefreshAccessToken[/dim]")
-                        # Salva il nuovo token nei file di sessione su disco in modo che persistano
+                        console.print("[dim]  -> Token DAZN rinfrescato a 24 ORE via RefreshAccessToken[/dim]")
                         if target_p:
                             for fname in ["dazn_session.json", "auth_token.json"]:
                                 s_file = target_p / fname
@@ -274,14 +275,13 @@ class HeadlessExtractor:
                                         s_file.write_text(json.dumps(data_s, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
                                     except Exception:
                                         pass
-                            # Sincronizza il nuovo token su GitHub
                             try:
                                 from app import sync_to_github
                                 sync_to_github(f"auto-refresh: aggiornato token JWT per {target_p.name}")
                             except Exception:
                                 pass
-            except Exception:
-                pass
+            except Exception as e_ref:
+                console.print(f"[dim]  -> Avviso RefreshAccessToken: {e_ref}[/dim]")
 
         if not jwt or not jwt.startswith("eyJ"):
             raise RuntimeError(
