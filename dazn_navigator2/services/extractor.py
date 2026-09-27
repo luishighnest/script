@@ -868,6 +868,9 @@ class HeadlessExtractor:
             "user-agent": ua,
             "referer": "https://www.dazn.com/",
             "origin": "https://www.dazn.com",
+            "dazn-token": dazn_token,
+        }).encode("utf-8")).decode("utf-8")
+
         # Costruisce SEMPRE l'URL MPD inserendo il JWT di 24h dell'account nel percorso /@jwt/
         forced_jwt = jwt if jwt and jwt.startswith("eyJ") else dazn_token
         if "://" in mpd_url_original:
