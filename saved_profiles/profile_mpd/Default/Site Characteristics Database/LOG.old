@@ -1,2 +1,4 @@
-2026/09/27-13:12:04.211 3cb4 Creating DB C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Site Characteristics Database since it was missing.
-2026/09/27-13:12:04.230 3cb4 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Site Characteristics Database/MANIFEST-000001
+2026/09/27-13:57:10.086 6d0 Creating DB C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Site Characteristics Database since it was missing.
+2026/09/27-13:57:10.232 6d0 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Site Characteristics Database/MANIFEST-000001
+2026/09/27-13:57:10.233 6d0 Recovering log #3
+2026/09/27-13:57:10.235 6d0 Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Site Characteristics Database/000003.log 

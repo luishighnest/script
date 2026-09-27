@@ -1,2 +1,4 @@
-2026/09/27-13:12:04.870 3cb4 Creating DB C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Extension State since it was missing.
-2026/09/27-13:12:04.884 3cb4 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Extension State/MANIFEST-000001
+2026/09/27-13:57:10.708 1788 Creating DB C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Extension State since it was missing.
+2026/09/27-13:57:10.728 1788 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Extension State/MANIFEST-000001
+2026/09/27-13:57:10.729 1788 Recovering log #3
+2026/09/27-13:57:10.731 1788 Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\Extension State/000003.log 

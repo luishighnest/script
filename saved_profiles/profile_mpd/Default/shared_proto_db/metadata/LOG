@@ -1,4 +1,3 @@
-2026/09/27-13:57:10.599 4170 Creating DB C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\shared_proto_db\metadata since it was missing.
-2026/09/27-13:57:10.620 4170 Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\shared_proto_db\metadata/MANIFEST-000001
-2026/09/27-13:57:10.622 4170 Recovering log #3
-2026/09/27-13:57:10.623 4170 Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\shared_proto_db\metadata/000003.log 
+2026/09/27-14:44:22.413 176c Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\shared_proto_db\metadata/MANIFEST-000001
+2026/09/27-14:44:22.415 176c Recovering log #3
+2026/09/27-14:44:22.419 176c Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\shared_proto_db\metadata/000003.log 
