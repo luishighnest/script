@@ -4,7 +4,7 @@ On Error Resume Next
 ' Avvio Ottimizzato Script2 - Chiusura processi orfani, tunnel e aggiornamento
 ' ==============================================================================
 
-base    = "C:\Users\alecl\Desktop\script2\"
+base    = "C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\"
 py      = "C:\Users\alecl\AppData\Local\Programs\Python\Python313\python.exe"
 cf      = "C:\Users\alecl\AppData\Local\Temp\opencode\cloudflared.exe"
 logfile = "C:\Users\alecl\AppData\Local\Temp\opencode\cf_bat.log"
