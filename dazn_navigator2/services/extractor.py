@@ -604,8 +604,17 @@ class HeadlessExtractor:
             c_tok = c_val if c_val else jwt
             c_fetch_url = c_mpd
             if c_val:
-                sep = "&" if "?" in c_fetch_url else "?"
-                c_fetch_url = f"{c_fetch_url}{sep}{c_name}={c_val}"
+                if c_val.startswith("eyJ") and "daznedge.net" not in c_mpd:
+                    if "://" in c_mpd:
+                        proto, rest = c_mpd.split("://", 1)
+                        if "/" in rest:
+                            host, path = rest.split("/", 1)
+                            c_fetch_url = f"{proto}://{host}/@{c_val}/{path}"
+                        else:
+                            c_fetch_url = f"{proto}://{rest}/@{c_val}"
+                else:
+                    sep = "&" if "?" in c_fetch_url else "?"
+                    c_fetch_url = f"{c_fetch_url}{sep}{c_name}={c_val}"
 
             c_hdrs = {
                 "origin": "https://www.dazn.com",
