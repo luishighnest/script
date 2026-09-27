@@ -483,18 +483,18 @@ class HeadlessExtractor:
         _t = time.time()
         sid = f"{int(time.time()*1000)}-{dev_id}-{asset_id}-{_uuid.uuid4().hex[:8].upper()}"
         pb_url = (f"{playback_svc}?AppVersion=0.149.9&DrmType=WIDEVINE&Format=MPEG-DASH"
-                  f"&PlayerId=%40dazn%2Fpeng-html5-core%2Flg%2Flg&Platform=lg&Model=OLED65CX6LA"
-                  f"&Secure=true&Manufacturer=lg&PlayReadyInitiator=false&Capabilities=hcst%2Cmta"
+                  f"&PlayerId=%40dazn%2Fpeng-html5-core%2Fweb%2Fweb&Platform=web&Model=unknown"
+                  f"&Secure=true&Manufacturer=Web&PlayReadyInitiator=false&Capabilities=hcst%2Cmta"
                   f"&AssetId={asset_id}&LanguageCode=it&country=it&CountryCode=it")
 
-        lg_ua = "Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+        web_ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
         if page:
             r_main_req = await page.request.get(pb_url, headers={
                 "authorization": f"Bearer {jwt}",
                 "dazn-token": jwt,
                 "x-dazn-device": dev_id,
-                "user-agent": lg_ua
+                "user-agent": web_ua
             })
             pb_r = {"ok": r_main_req.ok, "status": r_main_req.status, "body": await r_main_req.text()}
 
@@ -513,7 +513,7 @@ class HeadlessExtractor:
                 if page:
                     r_rail = await page.request.get(
                         "https://rail.discovery.indazn.com/eu/v1/Rail?id=live&country=it&language=it",
-                        headers={"authorization": f"Bearer {jwt}", "x-dazn-device": dev_id, "user-agent": lg_ua}
+                        headers={"authorization": f"Bearer {jwt}", "x-dazn-device": dev_id, "user-agent": web_ua}
                     )
                     if r_rail.ok:
                         r_data = await r_rail.json()
@@ -528,12 +528,12 @@ class HeadlessExtractor:
                         if match and match.get("AssetId") != asset_id:
                             fb_aid = match.get("AssetId")
                             console.print(f"[dim]  -> Fallback su evento Live attivo: {match.get('Title')} ({fb_aid})[/dim]")
-                            fb_url = f"{playback_svc}?AppVersion=0.149.9&DrmType=WIDEVINE&Format=MPEG-DASH&PlayerId=%40dazn%2Fpeng-html5-core%2Flg%2Flg&Platform=lg&Model=OLED65CX6LA&Secure=true&Manufacturer=lg&PlayReadyInitiator=false&Capabilities=hcst%2Cmta&AssetId={fb_aid}&LanguageCode=it&country=it&CountryCode=it"
+                            fb_url = f"{playback_svc}?AppVersion=0.149.9&DrmType=WIDEVINE&Format=MPEG-DASH&PlayerId=%40dazn%2Fpeng-html5-core%2Fweb%2Fweb&Platform=web&Model=unknown&Secure=true&Manufacturer=Web&PlayReadyInitiator=false&Capabilities=hcst%2Cmta&AssetId={fb_aid}&LanguageCode=it&country=it&CountryCode=it"
                             r_fb_req = await page.request.get(fb_url, headers={
                                 "authorization": f"Bearer {jwt}",
                                 "dazn-token": jwt,
                                 "x-dazn-device": dev_id,
-                                "user-agent": lg_ua
+                                "user-agent": web_ua
                             })
                             if r_fb_req.ok:
                                 pb_r = {"ok": True, "status": r_fb_req.status, "body": await r_fb_req.text()}
