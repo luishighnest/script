@@ -868,20 +868,28 @@ class HeadlessExtractor:
             "user-agent": ua,
             "referer": "https://www.dazn.com/",
             "origin": "https://www.dazn.com",
-            "dazn-token": dazn_token,
-        }).encode("utf-8")).decode("utf-8")
+        # Costruisce SEMPRE l'URL MPD inserendo il JWT di 24h dell'account nel percorso /@jwt/
+        forced_jwt = jwt if jwt and jwt.startswith("eyJ") else dazn_token
+        if "://" in mpd_url_original:
+            proto, rest = mpd_url_original.split("://", 1)
+            if "/" in rest:
+                host, path = rest.split("/", 1)
+                final_mpd_auth = f"{proto}://{host}/@{forced_jwt}/{path}"
+            else:
+                final_mpd_auth = f"{proto}://{rest}/@{forced_jwt}"
+        else:
+            final_mpd_auth = mpd_url_original
 
-        ext_mpd = chosen_fetch_url if chosen_fetch_url else mpd_url_original
+        ext_mpd = final_mpd_auth
 
         self.result["ext_url"] = (
             "extension://opmeopcambhfimffbomjgemehjkbbmji/pages/player.html#"
             f"{ext_mpd}&ck={urllib.parse.quote(ck)}&headers={urllib.parse.quote(hdrs_b64)}"
         )
 
-        # Utilizza l'esatto URL MPD nativo con il CdnToken compatto rilasciato dalla CDN per l'evento
-        self.result["mpd"] = ext_mpd
-
-        self.result["kodi_url"] = f"{fetch_mpd_url}&ck={ck}&headers={hdrs_b64}"
+        # Utilizza SEMPRE il formato /@JWT/ di 24h dell'account
+        self.result["mpd"] = final_mpd_auth
+        self.result["kodi_url"] = f"{final_mpd_auth}&ck={ck}&headers={hdrs_b64}"
 
         self.result["dazn_token"] = dazn_token
         self.result["jwt"] = jwt
