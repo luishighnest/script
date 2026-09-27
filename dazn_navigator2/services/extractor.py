@@ -602,7 +602,8 @@ class HeadlessExtractor:
         chosen_fetch_url = ""
 
         _t = time.time()
-        for cand_pbd in pbd:
+        pbd_sorted = sorted(pbd, key=lambda x: 0 if "indazn.com" in x.get("ManifestUrl", "").lower() else 1)
+        for cand_pbd in pbd_sorted:
             c_mpd = cand_pbd.get("ManifestUrl", "")
             c_la = cand_pbd.get("LaUrl", "")
             c_tok_obj = cand_pbd.get("CdnToken", {}) or {}
