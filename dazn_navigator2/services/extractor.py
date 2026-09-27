@@ -478,7 +478,7 @@ class HeadlessExtractor:
             model_param = "unknown"
             mfr_param = "Web"
 
-        playback_svc = f"{PROXY_WORKER}/v5/Playback" if PROXY_WORKER else "https://api.playback.indazn.com/v5/Playback"
+        playback_svc = "https://api.playback.indazn.com/v5/Playback"
         console.print(f"[dim]  -> Playback endpoint: {playback_svc}[/dim]")
         _t = time.time()
         sid = f"{int(time.time()*1000)}-{dev_id}-{asset_id}-{_uuid.uuid4().hex[:8].upper()}"
