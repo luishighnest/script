@@ -142,8 +142,8 @@ def main():
         if diff.returncode != 0:
             subprocess.run(["git", "commit", "-m", "redirect: supporto dynamic real-time zero-cache redirect"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
-        # Effettua SEMPRE il push per garantire che le modifiche e l'index.html siano su GitHub
-        subprocess.run(["git", "push", repo_url, "HEAD:main"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Effettua SEMPRE il push con --force per garantire che le modifiche e l'index.html siano su GitHub
+        subprocess.run(["git", "push", "--force", repo_url, "HEAD:main"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f"[redirect] File index.html e repo sincronizzati e pushati su GitHub.")
         return 0
     except Exception as e:
