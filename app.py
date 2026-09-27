@@ -100,7 +100,12 @@ def sync_to_github(commit_msg: str):
     try:
         subprocess.run(["git", "config", "user.name", "Render Auto-Sync"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["git", "config", "user.email", "render-sync@users.noreply.github.com"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["git", "add", "saved_profiles", "profiles_config.json", "dazn_event.json", "dazn_event_*.json"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Aggiunge i file esistenti
+        targets = ["saved_profiles", "profiles_config.json", "dazn_event.json", "dazn_navigator2"]
+        for t in targets:
+            if (BASE_DIR / t).exists():
+                subprocess.run(["git", "add", t], cwd=str(BASE_DIR), check=False, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         # Commit se ci sono cambiamenti
         diff = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=str(BASE_DIR), creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -388,6 +393,122 @@ def delete_profile_session():
         "github_sync": git_ok,
         "github_msg": git_msg
     })
+
+def refresh_all_dazn_sessions():
+    """Rinnova automaticamente tutti i token JWT DAZN in background prima che scadano."""
+    import requests
+    import time
+
+    cfg = load_profiles_config()
+    refreshed_any = False
+
+    for pid in list(PROFILES.keys()):
+        profile_dir = Path(get_active_chrome_profile(pid))
+        if not profile_dir.exists():
+            continue
+
+        session_file = profile_dir / "dazn_session.json"
+        auth_file = profile_dir / "auth_token.json"
+
+        if not session_file.exists() and not auth_file.exists():
+            continue
+
+        current_jwt = ""
+        session_data = {}
+
+        if session_file.exists():
+            try:
+                session_data = json.loads(session_file.read_text(encoding="utf-8"))
+                current_jwt = session_data.get("jwt", "")
+            except Exception:
+                pass
+
+        if not current_jwt and auth_file.exists():
+            try:
+                auth_data = json.loads(auth_file.read_text(encoding="utf-8"))
+                current_jwt = auth_data.get("jwt", "")
+            except Exception:
+                pass
+
+        if not current_jwt or not current_jwt.startswith("eyJ"):
+            continue
+
+        try:
+            # 1) Chiamata API ufficiale RefreshAccessToken DAZN
+            res = requests.post(
+                "https://ott-authz-bff-prod.ar.indazn.com/v5/RefreshAccessToken",
+                headers={
+                    "authorization": f"Bearer {current_jwt}",
+                    "content-type": "application/json",
+                    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+                },
+                timeout=12
+            )
+
+            if res.status_code == 200:
+                data = res.json()
+                new_token = data.get("AuthToken", {}).get("Token")
+                if new_token and new_token != current_jwt:
+                    print(f"[Auto-Refresh DAZN] Token rinnovato con successo per il profilo {pid}!")
+                    if session_file.exists():
+                        session_data["jwt"] = new_token
+                        session_data["created_at"] = int(time.time())
+                        session_file.write_text(json.dumps(session_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                    auth_file.write_text(json.dumps({"jwt": new_token}), encoding="utf-8")
+                    refreshed_any = True
+            elif res.status_code == 401:
+                print(f"[Auto-Refresh DAZN] Token per {pid} scaduto. Tentativo rinnovo da cookies...")
+                cookies = session_data.get("cookies", [])
+                if cookies:
+                    try:
+                        c_dict = {c["name"]: c["value"] for c in cookies if "name" in c and "value" in c}
+                        r_rail = requests.get(
+                            "https://stage-dazn-web-api.indazn.com/v2/rail?id=Home",
+                            cookies=c_dict,
+                            headers={"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+                            timeout=10
+                        )
+                        fresh_jwt = r_rail.headers.get("authorization") or r_rail.headers.get("dazn-token")
+                        if fresh_jwt and fresh_jwt.startswith("Bearer "):
+                            fresh_jwt = fresh_jwt.replace("Bearer ", "").strip()
+                        if fresh_jwt and fresh_jwt.startswith("eyJ"):
+                            print(f"[Auto-Refresh DAZN] Token ripristinato con successo dai cookies per {pid}!")
+                            session_data["jwt"] = fresh_jwt
+                            session_data["created_at"] = int(time.time())
+                            session_file.write_text(json.dumps(session_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                            auth_file.write_text(json.dumps({"jwt": fresh_jwt}), encoding="utf-8")
+                            refreshed_any = True
+                    except Exception as e_c:
+                        print(f"[Auto-Refresh DAZN] Errore rinnovo da cookies: {e_c}")
+        except Exception as e:
+            print(f"[Auto-Refresh DAZN Error] {pid}: {e}")
+
+    if refreshed_any:
+        sync_to_github("auto-refresh: rinnovo automatico token DAZN per i profili")
+
+def _background_dazn_refresher():
+    """Thread in sottofondo che esegue il rinnovo automatico ogni 45 minuti."""
+    time.sleep(15)
+    while True:
+        try:
+            refresh_all_dazn_sessions()
+        except Exception as e:
+            print(f"[Auto-Refresh Loop Error] {e}")
+        time.sleep(2700) # Ogni 45 minuti
+
+_refresher_thread = threading.Thread(target=_background_dazn_refresher, daemon=True)
+_refresher_thread.start()
+
+@app.route("/api/refresh-dazn-session", methods=["POST"])
+def api_refresh_dazn_session():
+    """Endpoint per sollecitare il rinnovo manuale o via cron/webhook della sessione DAZN."""
+    if "user_profile_id" not in session:
+        return jsonify({"ok": False, "error": "Non autenticato"}), 401
+    try:
+        refresh_all_dazn_sessions()
+        return jsonify({"ok": True, "message": "Rinnovo sessione eseguito con successo!"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/events", methods=["GET"])
 def get_saved_events():
