@@ -39,5 +39,16 @@
          "key": "83da9a5152cc51cba49c626d41d530e4:7c41e715911fc5a600586f56ac9cb476",
          "ua": ""
       }
+   ],
+   "Pro Padel League": [
+      {
+         "name": "Playa Del Carmen | Giorno 4",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/88mll9d9i5y1dpfzrqfmfc1rz_image-header_pIt_1790235940000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2026-09-27T13:30:00Z",
+         "end": "2026-09-27T22:15:00Z",
+         "mpd": "https://dca-ac-live.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvMXNjM2s1dno3MzVyeTEzcHRua2Jiem94eGciXSwiZXhjIjpbXSwiaGVhZGVycyI6WyJ1c2VyLWFnZW50Il0sImNvIjp0cnVlLCJpcCI6ZmFsc2UsImFzbiI6WyIxMzMzNSJdLCJzc2lkIjoiYTM1ZDAwZWM5ZTIzIiwiaW50c2lnIjoiZm9RTklJeVczZHFVVGFjMm02aTlCZlpoU3ppZ2U1NDBKZTZ4cGlMWVVQayIsImlhdCI6MTc5MDU0NjU3MiwiZXhwIjoxNzkwNjMyOTcyfQ.qeYMMIEK-wCUiNRIRTpkXC1RreYmV6T7Td_d703V-6Q/1sc3k5vz735ry13ptnkbbzoxxg/web/stream.mpd?channel=5478&outlet=dazn-italy&plang=it",
+         "key": "60009a1f50a057d28ee4bdde0bf85ae7:515c3ecb18cfc98fdc4a79c63dbd7483",
+         "ua": ""
+      }
    ]
 }
