@@ -613,10 +613,11 @@ class HeadlessExtractor:
             if not c_mpd or not c_la:
                 continue
 
+            token_for_url = jwt if (jwt and jwt.startswith("eyJ")) else c_val
             c_fetch_url = c_mpd
-            if c_val:
+            if token_for_url:
                 sep = "&" if "?" in c_fetch_url else "?"
-                c_fetch_url = f"{c_fetch_url}{sep}{c_name}={c_val}"
+                c_fetch_url = f"{c_fetch_url}{sep}{c_name}={token_for_url}"
 
             c_hdrs = {
                 "origin": "https://www.dazn.com",
