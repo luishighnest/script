@@ -9,5 +9,16 @@
          "key": "6164a0abaa7c53c6875fa1e7fe0bb463:271510d3e1259571dcc568a232e397eb",
          "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
       }
+   ],
+   "Campionati del Mondo di Ciclismo su Strada": [
+      {
+         "name": "Mondiali ciclismo | Linea uomini élite",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/xebyxhkfuvoqccipdgifrtyq_image-header_pIt_1789988489000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2026-09-27T13:00:00Z",
+         "end": "2026-09-27T20:45:00Z",
+         "mpd": "https://dca-ac-live.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvMTlsdTUzajY5Mmw2bDE2dHVuZHlyMW90b3MiXSwiZXhjIjpbXSwiaGVhZGVycyI6WyJ1c2VyLWFnZW50Il0sImNvIjp0cnVlLCJpcCI6ZmFsc2UsImFzbiI6WyIxMzMzNSJdLCJzc2lkIjoiYTM1ZDAwZWM5ZTIzIiwiaW50c2lnIjoiZm9RTklJeVczZHFVVGFjMm02aTlCZlpoU3ppZ2U1NDBKZTZ4cGlMWVVQayIsImlhdCI6MTc5MDUzNTM4MCwiZXhwIjoxNzkwNTM1NjgwfQ.T2EPgQjDt72vVsllrmJQJBDzKlZTcN58XFkz5Y_lzjw/19lu53j692l6l16tundyr1otos/web/stream.mpd?channel=5072&outlet=dazn-italy&plang=it",
+         "key": "704bf9e972a95a65b2636e8e32f9485f:a574723c71d3302d57ca16785901ae82",
+         "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      }
    ]
 }
