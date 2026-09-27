@@ -29,5 +29,16 @@
          "key": "1bde79b9c469565d9904e673b137ee85:07542731c48457a0794ef16284435048",
          "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
       }
+   ],
+   "UCI Pro Series (M)": [
+      {
+         "name": "Tour de Langkawi | 1ª tappa",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/emq7egl1d7ztjjygohoau1wpm_image-header_pIt_1756999177000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2026-09-27T10:00:00Z",
+         "end": "2026-09-27T11:45:00Z",
+         "mpd": "https://dca-de-livedazn.daznedge.net/1tcxo5606i24n13g6w9iapn1t1/tv/stream.mpd?channel=5070&outlet=dazn-italy&plang=it&dazn-token=tend:1790508702~proto:dash~geo:IT~asn:13335~path:1_1_d98cf60676e1b1bef4be6459155dddc210892acab924d91d2381a4befa1630ee~id:a35d00ec9e23~tk3:6c6a96e1e3b92ccccffdf069cd3d9d098fce4c5dede573239330ba6a25525067",
+         "key": "e631288e412b51759b5a1bdc4aff72e8:6b415b9cc7ffe45ca7fc8de712df2165",
+         "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      }
    ]
 }
