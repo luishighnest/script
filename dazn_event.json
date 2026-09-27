@@ -29,5 +29,16 @@
          "key": "5b95fea44d1458128174961a2f43244c:8eac54008e5cb7e3751156ad53ca5625",
          "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
       }
+   ],
+   "Laver Cup": [
+      {
+         "name": "Giorno 3 | Zverev - Tien",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/e2u7vz4y0ypbgbi6pqj750zin_image-header_pIt_1790500528000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2026-09-27T11:00:00Z",
+         "end": "2026-09-27T13:45:00Z",
+         "mpd": "https://dca-ac-live.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvbXN0YjNxcWc3YTcyMXR5bDV2MGppZnZycyJdLCJleGMiOltdLCJoZWFkZXJzIjpbXSwiY28iOnRydWUsImlwIjpmYWxzZSwiYXNuIjpbIjEzMzM1Il0sInNzaWQiOiJhMzVkMDBlYzllMjMiLCJpbnRzaWciOiJTajdhRjhCcnpiMkljTzI4a0xKcldBcDQ3LV92SmRkanROOWw5VzBTdndNIiwiaWF0IjoxNzkwNTA3OTYzLCJleHAiOjE3OTA1MDgyNjN9.ku3SPY_8_cbwKP44XJAXZU9_UToxVRB9szfZz7pzNaA/mstb3qqg7a721tyl5v0jifvrs/tv/stream.mpd?channel=7004&outlet=dazn-italy&plang=it",
+         "key": "1bde79b9c469565d9904e673b137ee85:07542731c48457a0794ef16284435048",
+         "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      }
    ]
 }
