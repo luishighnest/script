@@ -30,11 +30,14 @@ Next
 ' Libera la porta 5000 se ancora occupata
 sh.Run "cmd /c ""for /f ""tokens=5"" %a in ('netstat -aon ^| findstr "":5000"" ^| findstr ""LISTENING""') do taskkill /f /pid %a""", 0, True
 
-' Breve pausa per rilascio socket di rete
-WScript.Sleep 1000
+' Breve pausa per rilascio socket e file lock
+WScript.Sleep 1500
 
 ' 2) Pulizia log precedente del tunnel
-If fso.FileExists(logfile) Then fso.DeleteFile logfile
+If fso.FileExists(logfile) Then
+    Err.Clear
+    fso.DeleteFile logfile, True
+End If
 
 ' 3) Avvio Flask nascosto su localhost
 sh.CurrentDirectory = base
@@ -44,7 +47,7 @@ sh.Run """" & py & """ app.py", 0, False
 WScript.Sleep 2500
 
 ' 4) Avvio Tunnel Cloudflare puntando a IPv4 127.0.0.1 (evita conflitti IPv6 / 502)
-sh.Run """" & cf & """ tunnel --url http://127.0.0.1:5000 --no-autoupdate --logfile """ & logfile & """ --loglevel info", 0, False
+sh.Run """" & cf & """ tunnel --protocol http2 --url http://127.0.0.1:5000 --no-autoupdate --logfile """ & logfile & """ --loglevel info", 0, False
 
 ' 5) Polling dinamico per il link del tunnel (fino a 30 secondi)
 link = ""
