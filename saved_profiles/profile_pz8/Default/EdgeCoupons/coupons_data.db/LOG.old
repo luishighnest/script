@@ -1,6 +1,0 @@
-2026/09/16-19:35:24.202 3b10 Reusing MANIFEST C:\Users\alecl\Desktop\dazn11\chrome_profile\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/09/16-19:35:26.150 3b10 Recovering log #4
-2026/09/16-19:35:26.151 3b10 Reusing old log C:\Users\alecl\Desktop\dazn11\chrome_profile\Default\EdgeCoupons/coupons_data.db/000004.log 
-2026/09/16-19:35:36.067 1cf4 Level-0 table #8: started
-2026/09/16-19:35:36.077 1cf4 Level-0 table #8: 683455 bytes OK
-2026/09/16-19:35:36.082 1cf4 Delete type=0 #4
