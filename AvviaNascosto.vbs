@@ -28,13 +28,13 @@ End If
 
 ' 3) Avvio Flask nascosto su localhost
 sh.CurrentDirectory = base
-sh.Run """" & py & """ app.py", 0, False
+sh.Run "cmd /c start /b """" """ & py & """ """ & base & "app.py""", 0, False
 
 ' Attende che Flask si inizializzi
-WScript.Sleep 2500
+WScript.Sleep 4000
 
 ' 4) Avvio Tunnel Cloudflare puntando a IPv4 127.0.0.1 (evita conflitti IPv6 / 502)
-sh.Run """" & cf & """ tunnel --edge-ip-version 4 --protocol http2 --url http://127.0.0.1:5000 --no-autoupdate --logfile """ & logfile & """ --loglevel info", 0, False
+sh.Run "cmd /c start /b """" """ & cf & """ tunnel --edge-ip-version 4 --protocol http2 --url http://127.0.0.1:5000 --no-autoupdate --logfile """ & logfile & """ --loglevel info", 0, False
 
 ' 5) Polling dinamico per il link del tunnel (fino a 30 secondi)
 link = ""
