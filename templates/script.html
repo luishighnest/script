@@ -61,7 +61,6 @@
             font-weight: 600;
             letter-spacing: 0.8px;
             text-transform: uppercase;
-            transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
         }
         .nav-pills .nav-link:hover {
             color: #ffffff;
@@ -92,7 +91,6 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transition: border-color .15s ease;
         }
         .extracted-card:hover { border-color: var(--accent); }
         .extracted-card .now-card {
@@ -121,7 +119,6 @@
             background: #11141b;
             border: 1px solid transparent;
             transform: translateZ(0);
-            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease;
             z-index: 1;
             cursor: pointer;
         }
@@ -141,13 +138,11 @@
             border-radius: 20px;
             box-shadow: 0 28px 56px rgba(0,0,0,0.55), 0 14px 28px rgba(0,0,0,0.35);
             opacity: 0;
-            transition: opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1);
             pointer-events: none;
             z-index: 0;
         }
         .now-card-wrapper:hover::before { opacity: 1; }
         .now-card-wrapper:hover .now-card {
-            transform: scale(1.05) translateY(-6px);
             border-color: rgba(0, 229, 155, 0.55);
         }
         .now-card::after {
@@ -157,7 +152,6 @@
             width: 100%; height: 100%;
             background: radial-gradient(circle at center, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.6) 100%);
             opacity: 0;
-            transition: opacity 0.25s ease;
             z-index: 4;
             pointer-events: none;
         }
@@ -183,7 +177,7 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            transform: translate(-50%, -50%) scale(0.8);
+            transform: translate(-50%, -50%);
             width: 50px;
             height: 50px;
             background: rgba(20,20,24,0.45);
@@ -199,12 +193,10 @@
             opacity: 0;
             z-index: 5;
             pointer-events: none;
-            transition: transform 0.3s cubic-bezier(0.16,1,0.3,1), opacity 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
             box-shadow: 0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.4);
         }
         .now-card-wrapper:hover .now-card-play-icon {
             opacity: 1;
-            transform: translate(-50%, -50%) scale(1.05);
             background: rgba(255,255,255,0.22);
             border-color: rgba(255,255,255,0.7);
             box-shadow: 0 12px 28px rgba(0,0,0,0.6), 0 0 20px rgba(255,255,255,0.25);
@@ -274,7 +266,6 @@
             box-shadow: 0 4px 16px rgba(0, 229, 155, 0.25);
         }
         .btn-dazn:hover { background-color: #2cf0ad; color: #04120c; box-shadow: 0 6px 20px rgba(0, 229, 155, 0.35); }
-        .btn-dazn:active { transform: scale(0.97); }
 
         .btn-outline-mini {
             background: transparent;
@@ -300,7 +291,6 @@
             text-align: center;
             background-color: #0b0f14;
             cursor: pointer;
-            transition: border-color .2s;
         }
         .file-upload-box:hover { border-color: var(--accent); }
 
@@ -574,16 +564,60 @@
         }
 
         .extracted-card {
-            background: rgba(17, 18, 26, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 14px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-            transition: border-color 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+            background: rgba(17, 18, 26, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
         .extracted-card:hover {
-            border-color: rgba(0, 229, 155, 0.4);
-            transform: translateY(-3px);
+            border-color: rgba(0, 229, 155, 0.45);
         }
+        .extracted-card-body {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            min-height: 0;
+        }
+        .extracted-title {
+            font-size: .74rem;
+            font-weight: 650;
+            line-height: 1.25;
+            letter-spacing: -0.1px;
+            color: #ffffff;
+            min-width: 0;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .extracted-action {
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .72rem;
+            border-radius: 7px;
+        }
+        .extracted-copy {
+            flex: 1 1 0;
+            min-width: 0;
+            font-size: .7rem;
+            font-weight: 700;
+            letter-spacing: .02em;
+            border-radius: 7px;
+            padding: 5px 6px;
+            white-space: nowrap;
+        }
+        .extracted-col { flex: 0 0 100%; max-width: 100%; }
+        @media (min-width: 576px) { .extracted-col { flex: 0 0 50%; max-width: 50%; } }
+        @media (min-width: 768px) { .extracted-col { flex: 0 0 33.333%; max-width: 33.333%; } }
+        @media (min-width: 1200px) { .extracted-col { flex: 0 0 25%; max-width: 25%; } }
 
         .json-viewer {
             background-color: rgba(11, 15, 25, 0.9);
@@ -644,6 +678,87 @@
 
         .toast-desc { color: rgba(255, 255, 255, 0.55) !important; }
         .extract-toast.error { border-left-color: #ff544a; }
+
+        /* ═══ MODALITÀ IMMEDIATA: nessuna transizione né animazione decorativa ═══ */
+        * { transition: none !important; }
+        .poster-col,
+        .skeleton-grid .poster-col,
+        .tab-pane,
+        .dot-pulse,
+        .extract-toast,
+        .btn,
+        .nav-pills .nav-link,
+        .extracted-card,
+        .file-upload-box,
+        .now-card,
+        .now-card-wrapper::before,
+        .now-card::after,
+        .now-card-play-icon,
+        .badge {
+            animation: none !important;
+        }
+        .tab-pane.fade { opacity: 1 !important; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.15); }
+
+        /* ═══ BARRA PROFILO UNIFICATA: tasti del riquadro profilo ═══ */
+        .profile-btn {
+            height: 32px;
+            padding: 0 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            border-radius: 9px;
+            font-family: inherit;
+            font-size: .76rem;
+            font-weight: 700;
+            letter-spacing: .02em;
+            line-height: 1;
+            white-space: nowrap;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px) saturate(160%);
+            -webkit-backdrop-filter: blur(10px) saturate(160%);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+        }
+        .profile-btn i { font-size: .8rem; }
+        .profile-btn:hover { background: rgba(255, 255, 255, 0.12); color: #ffffff; border-color: rgba(255, 255, 255, 0.28); }
+        .profile-btn-success {
+            background: rgba(0, 229, 155, 0.1);
+            border-color: rgba(0, 229, 155, 0.35);
+            color: #00e59b;
+        }
+        .profile-btn-success:hover { background: #00e59b; color: #04120c; border-color: #00e59b; }
+        .profile-btn-danger {
+            background: rgba(255, 59, 48, 0.09);
+            border-color: rgba(255, 59, 48, 0.35);
+            color: #ff6b61;
+        }
+        .profile-btn-danger:hover { background: #ff3b30; color: #ffffff; border-color: #ff3b30; }
+        .profile-btn:disabled { opacity: .6; }
+        .navbar .btn-outline-mini {
+            height: 32px;
+            min-width: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9px;
+        }
+        .profile-status {
+            font-size: .76rem;
+            line-height: 1.3;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .profile-status code { font-size: .72rem; }
+        .session-timer {
+            border-radius: 9px;
+            font-size: .76rem !important;
+            line-height: 1;
+        }
     </style>
 </head>
 <body>
@@ -685,48 +800,53 @@
     <!-- INTERFACCIA SCRIPT COMPLETA -->
     <div id="section-main" class="d-none">
 <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
-            <div class="container">
-                <a class="navbar-brand fw-bold" href="/script">
-                    <i class="fa-solid fa-play me-2"></i>Script2
-                </a>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-secondary me-2"><i class="fa-solid fa-user me-1"></i> <span id="top-profile-badge">{{ profile_name }}</span></span>
-                    <a href="/playlist.m3u" target="_blank" class="btn btn-sm btn-outline-mini">
-                        <i class="fa-solid fa-download me-1"></i> M3U
-                    </a>
-                    <button class="btn btn-sm btn-outline-mini" onclick="refreshData()">
-                        <i class="fa-solid fa-arrows-rotate"></i>
-                    </button>
-                    <a href="/logout" class="btn btn-sm btn-outline-mini">
-                        <i class="fa-solid fa-right-from-bracket"></i>
-                    </a>
+            <div class="container py-2">
+                <div class="d-flex flex-column w-100 gap-2">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <a class="navbar-brand fw-bold" href="/script">
+                            <i class="fa-solid fa-play me-2"></i>Script2
+                        </a>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="badge bg-secondary me-1"><i class="fa-solid fa-user me-1"></i> <span id="top-profile-badge">{{ profile_name }}</span></span>
+                            <a href="/playlist.m3u" target="_blank" class="btn btn-sm btn-outline-mini" title="Scarica playlist M3U">
+                                <i class="fa-solid fa-download me-1"></i> M3U
+                            </a>
+                            <button class="btn btn-sm btn-outline-mini" onclick="refreshData()" title="Aggiorna dati">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </button>
+                            <a href="/logout" class="btn btn-sm btn-outline-mini" title="Esci">
+                                <i class="fa-solid fa-right-from-bracket"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <small class="text-secondary profile-status" id="profile-status-wrapper">
+                            {% if chrome_profile_set and chrome_profile_path != "Nessun profilo caricato" %}
+                                <i class="fa-solid fa-circle-check text-success me-1" id="profile-status-icon"></i> <span id="profile-status-label">Profilo attivo:</span> <code id="active-profile-path" class="text-info">{{ chrome_profile_path }}</code>
+                            {% else %}
+                                <i class="fa-solid fa-circle-xmark text-danger me-1" id="profile-status-icon"></i> <span id="profile-status-label">Profilo non attivo:</span> <code id="active-profile-path" class="text-secondary">{{ chrome_profile_path }}</code>
+                            {% endif %}
+                        </small>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span id="session-timer-badge" class="badge bg-dark border border-secondary text-light py-1 px-2 font-monospace session-timer" style="display: none;">
+                                <i class="fa-solid fa-clock text-warning me-1"></i>Scadenza DAZN: <span id="session-timer-text">--:--:--</span>
+                            </span>
+                            <button class="profile-btn profile-btn-success" onclick="manualRefreshDaznSession()" id="btn-refresh-session" title="Forza il rinnovo immediato del token di sessione DAZN">
+                                <i class="fa-solid fa-arrows-rotate"></i> Aggiorna Sessione DAZN
+                            </button>
+                            <button class="profile-btn" onclick="showZipSetup()" title="Carica il file dazn_session.json del profilo">
+                                <i class="fa-solid fa-upload"></i> Carica file JSON
+                            </button>
+                            <button class="profile-btn profile-btn-danger" onclick="deleteProfileSession()" title="Elimina la sessione JSON salvata per questo profilo">
+                                <i class="fa-solid fa-trash"></i> Elimina Sessione
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </nav>
 
         <div class="container py-3">
-            <div class="alert alert-dark border-secondary d-flex justify-content-between align-items-center mb-3 py-1" style="border-radius: 8px; --bs-alert-bg: #11161d;">
-                <small class="text-secondary" id="profile-status-wrapper">
-                    {% if chrome_profile_set and chrome_profile_path != "Nessun profilo caricato" %}
-                        <i class="fa-solid fa-circle-check text-success me-1" id="profile-status-icon"></i> <span id="profile-status-label">Profilo attivo:</span> <code id="active-profile-path" class="text-info">{{ chrome_profile_path }}</code>
-                    {% else %}
-                        <i class="fa-solid fa-circle-xmark text-danger me-1" id="profile-status-icon"></i> <span id="profile-status-label">Profilo non attivo:</span> <code id="active-profile-path" class="text-secondary">{{ chrome_profile_path }}</code>
-                    {% endif %}
-                </small>
-                <div class="d-flex align-items-center gap-2">
-                    <span id="session-timer-badge" class="badge bg-dark border border-secondary text-light py-1 px-2 font-monospace" style="font-size: 0.82rem; display: none;">
-                        <i class="fa-solid fa-clock text-warning me-1"></i>Scadenza DAZN: <span id="session-timer-text">--:--:--</span>
-                    </span>
-                    <button class="btn btn-sm btn-outline-warning py-0 px-2" onclick="manualRefreshDaznSession()" id="btn-refresh-session" title="Forza il rinnovo immediato del token di sessione DAZN">
-                        <i class="fa-solid fa-arrows-rotate me-1"></i>Aggiorna Sessione DAZN
-                    </button>
-                    <button class="btn btn-sm btn-outline-mini py-0 px-2" onclick="showZipSetup()">Carica file JSON</button>
-                    <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteProfileSession()" title="Elimina la sessione JSON salvata per questo profilo">
-                        <i class="fa-solid fa-trash me-1"></i>Elimina Sessione
-                    </button>
-                </div>
-            </div>
-
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
                 <ul class="nav nav-pills" id="viewTabs" role="tablist">
                     <li class="nav-item">
@@ -773,9 +893,6 @@
                 <div class="tab-pane fade show active" id="extracted-pane">
                     <div class="row g-3">
                         <div class="col-lg-9">
-                            <div class="d-flex align-items-center section-head">
-                                <h6 class="text-white mb-0"><i class="fa-solid fa-images me-2"></i>Locandine</h6>
-                            </div>
                             <div class="row g-2" id="extracted-container">
                                 <div class="col-12 text-center py-5">
                                     <div class="spinner-border text-warning" role="status"></div>
@@ -1072,7 +1189,7 @@ function showZipSetup(reasonText) {
 
                 entries.forEach((entryInfo, eidx) => {
                     const col = document.createElement('div');
-                    col.className = 'poster-col';
+                    col.className = 'poster-col extracted-col';
 
                     const { comp, idx, extUrl, itemObj } = entryInfo;
                     const mpd = itemObj.mpd;
@@ -1088,29 +1205,27 @@ function showZipSetup(reasonText) {
                     col.innerHTML = `
                         <div class="extracted-card">
                             <div class="extracted-card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="poster-title mb-0">${itemObj.name}</h6>
-                                    <div class="d-flex gap-1">
-                                        <button class="btn btn-sm btn-outline-mini py-0 px-2" data-comp="${encodeURIComponent(comp)}" data-idx="${idx}" data-name="${encodeURIComponent(itemObj.name)}" onclick="openRenameModal(this)" title="Rinomina">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                    <h6 class="extracted-title mb-0" title="${itemObj.name}">${itemObj.name}</h6>
+                                    <div class="d-flex gap-1 flex-shrink-0">
+                                        <button class="btn btn-outline-mini extracted-action" data-comp="${encodeURIComponent(comp)}" data-idx="${idx}" data-name="${encodeURIComponent(itemObj.name)}" onclick="openRenameModal(this)" title="Rinomina">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-outline-mini py-0 px-2" data-comp="${encodeURIComponent(comp)}" data-idx="${idx}" onclick="deleteEvent(this)" title="Elimina">
+                                        <button class="btn btn-outline-mini extracted-action" data-comp="${encodeURIComponent(comp)}" data-idx="${idx}" onclick="deleteEvent(this)" title="Elimina">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </div>
                                 </div>
                                 <div class="badge-extracted mb-2"><i class="fa-solid fa-check me-1"></i>${comp}</div>
-                                <div class="d-flex gap-1 mb-2">
-                                    <button class="btn btn-outline-mini flex-fill" onclick='copyEntry(${eidx}, "mpd", "Manifest MPD copiato!")'>
-                                        <i class="fa-solid fa-copy"></i> MPD
+                                <div class="d-flex gap-1 mt-auto">
+                                    <button class="btn btn-outline-mini extracted-copy" onclick='copyEntry(${eidx}, "mpd", "Manifest MPD copiato!")' title="Copia Manifest MPD">
+                                        <i class="fa-solid fa-file me-1"></i>MPD
                                     </button>
-                                    <button class="btn btn-outline-mini flex-fill" onclick='copyEntry(${eidx}, "keys", "Chiavi copiate!")'>
-                                        <i class="fa-solid fa-key"></i> Key
+                                    <button class="btn btn-outline-mini extracted-copy" onclick='copyEntry(${eidx}, "keys", "Chiavi copiate!")' title="Copia chiavi DRM">
+                                        <i class="fa-solid fa-key me-1"></i>KEY
                                     </button>
-                                </div>
-                                <div class="mb-1">
-                                    <button class="btn btn-outline-mini w-100" onclick='copyEntry(${eidx}, "jsonStr", "JSON copiato!")'>
-                                        <i class="fa-solid fa-code"></i> Copia JSON
+                                    <button class="btn btn-outline-mini extracted-copy" onclick='copyEntry(${eidx}, "jsonStr", "JSON copiato!")' title="Copia JSON evento">
+                                        <i class="fa-solid fa-code me-1"></i>JSON
                                     </button>
                                 </div>
                             </div>
@@ -1488,7 +1603,6 @@ function showZipSetup(reasonText) {
             tiles.forEach((t, i) => {
                 const col = document.createElement('div');
                 col.className = 'poster-col';
-                col.style.animationDelay = `${Math.min(i * 22, 500)}ms`;
                 const ttype = (t.tile_type || '').toLowerCase();
                 const isNav = ttype === 'navigation';
                 let badgeColor = 'badge-live';
@@ -1581,11 +1695,7 @@ function showZipSetup(reasonText) {
                     <div class="toast-desc text-success">${desc || 'Estratto e salvato con successo!'}</div>
                 </div>
             `;
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(50px)';
-                setTimeout(() => toast.remove(), 300);
-            }, 4500);
+            setTimeout(() => toast.remove(), 4500);
         }
 
         function updateToastError(toast, title, errorMsg) {
@@ -1599,11 +1709,7 @@ function showZipSetup(reasonText) {
                     <div class="toast-desc text-danger">${errorMsg || 'Errore durante l\'estrazione'}</div>
                 </div>
             `;
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(50px)';
-                setTimeout(() => toast.remove(), 300);
-            }, 6000);
+            setTimeout(() => toast.remove(), 6000);
         }
 
         async function extractItem(id, asset_id, encodedTitle, encodedImage = '', encodedComp = '', encodedStart = '', encodedEnd = '') {
@@ -1669,11 +1775,7 @@ function showCopyToast(msg, isError) {
                 </div>
             `;
             container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(50px)';
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
+            setTimeout(() => toast.remove(), 3500);
         }
 
         function fallbackCopyText(text) {
