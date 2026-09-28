@@ -776,11 +776,11 @@
             <div id="setup-error" class="alert alert-danger d-none py-2 small"></div>
             <form onsubmit="handleZipUpload(event)">
                 <div class="mb-3">
-                    <label class="form-label text-secondary small">Seleziona il file <strong>dazn_session.json</strong> (o auth_token.json):</label>
+                    <label class="form-label text-secondary small">Seleziona il file <strong>chrome_profile.zip</strong>:</label>
                     <div class="file-upload-box" onclick="document.getElementById('input-zip').click()">
                         <i class="fa-solid fa-file-code fa-2x text-warning mb-2"></i>
-                        <p class="mb-1 text-white small" id="zip-chosen-name">Clicca per selezionare dazn_session.json</p>
-                        <span class="text-muted" style="font-size: 0.75rem;">(File leggero di autenticazione DAZN salvato per questo profilo)</span>
+                        <p class="mb-1 text-white small" id="zip-chosen-name">Clicca per aggiungere chrome_profile.zip</p>
+                        <span class="text-muted" style="font-size: 0.75rem;">(Zip del profilo browser DAZN salvato per questo profilo)</span>
                     </div>
                     <input type="file" id="input-zip" accept=".json,.zip" class="d-none" onchange="zipSelected(this)">
                 </div>
@@ -791,7 +791,7 @@
                     <div id="upload-status-text" class="text-center small text-secondary mt-1">Caricamento sessione in corso...</div>
                 </div>
                 <button type="submit" id="btn-submit-zip" class="btn btn-dazn w-100 py-2">
-                    <i class="fa-solid fa-upload me-2"></i>Carica Sessione JSON e Apri Script
+                    <i class="fa-solid fa-upload me-2"></i>Carica Chrome Profile e Apri Script
                 </button>
             </form>
         </div>
@@ -829,12 +829,12 @@
                         </small>
                         <div class="d-flex flex-wrap align-items-center gap-2">
                             <span id="session-timer-badge" class="badge bg-dark border border-secondary text-light py-1 px-2 font-monospace session-timer" style="display: none;">
-                                <i class="fa-solid fa-clock text-warning me-1"></i>Scadenza DAZN: <span id="session-timer-text">--:--:--</span>
+                                <i class="fa-solid fa-clock text-success me-1"></i>Scadenza DAZN: <span id="session-timer-text">--:--:--</span>
                             </span>
                             <button class="profile-btn profile-btn-success" onclick="manualRefreshDaznSession()" id="btn-refresh-session" title="Forza il rinnovo immediato del token di sessione DAZN">
                                 <i class="fa-solid fa-arrows-rotate"></i> Aggiorna Sessione DAZN
                             </button>
-                            <button class="profile-btn" onclick="showZipSetup()" title="Carica il file dazn_session.json del profilo">
+                            <button class="profile-btn" onclick="showZipSetup()" title="Carica il file chrome_profile.zip del profilo">
                                 <i class="fa-solid fa-upload"></i> Carica file JSON
                             </button>
                             <button class="profile-btn profile-btn-danger" onclick="deleteProfileSession()" title="Elimina la sessione JSON salvata per questo profilo">
@@ -903,8 +903,8 @@
                         <div class="col-lg-3">
                             <div class="d-flex align-items-center justify-content-between section-head">
                                 <h6 class="text-white mb-0"><i class="fa-solid fa-code me-2"></i>JSON Completo</h6>
-                                <button class="btn btn-sm btn-outline-mini py-0 px-2" onclick="copyAllJson()" title="Copia tutto il JSON">
-                                    <i class="fa-solid fa-copy me-1"></i> Copia
+                                <button class="btn btn-sm btn-outline-mini py-0 px-2" onclick="copyAllJson()" title="Copia tutto il JSON (identico all'API)">
+                                    <i class="fa-solid fa-copy me-1"></i> Copia JSON
                                 </button>
                             </div>
                             <div class="json-viewer">
@@ -1020,7 +1020,7 @@ function showZipSetup(reasonText) {
             document.getElementById('section-profile-setup').classList.remove('d-none');
             document.getElementById('section-main').classList.add('d-none');
             document.getElementById('input-zip').value = "";
-            document.getElementById('zip-chosen-name').innerText = "Clicca per selezionare dazn_session.json";
+            document.getElementById('zip-chosen-name').innerText = "Clicca per aggiungere chrome_profile.zip";
             const errDiv = document.getElementById('setup-error');
             if (reasonText) {
                 errDiv.innerText = reasonText;
@@ -1073,7 +1073,7 @@ function showZipSetup(reasonText) {
             errDiv.classList.add('d-none');
 
             if (!fileInput.files || !fileInput.files[0]) {
-                errDiv.innerText = "Seleziona il file dazn_session.json.";
+                errDiv.innerText = "Seleziona il file chrome_profile.zip.";
                 errDiv.classList.remove('d-none');
                 return;
             }
@@ -1104,7 +1104,7 @@ function showZipSetup(reasonText) {
                     updateProfileStatusUI(data.chrome_profile_path, true);
                     showMain();
                 } else {
-                    errDiv.innerText = data.error || 'Errore durante il caricamento del file JSON';
+                    errDiv.innerText = data.error || 'Errore durante il caricamento del file';
                     errDiv.classList.remove('d-none');
                 }
             } catch (err) {
@@ -1117,7 +1117,7 @@ function showZipSetup(reasonText) {
         }
 
         async function deleteProfileSession() {
-            if (!confirm("Sei sicuro di voler eliminare la sessione JSON di questo profilo? Dovrai ricaricare dazn_session.json per continuare ad usare lo script.")) {
+            if (!confirm("Sei sicuro di voler eliminare la sessione JSON di questo profilo? Dovrai ricaricare chrome_profile.zip per continuare ad usare lo script.")) {
                 return;
             }
             try {
@@ -1126,7 +1126,7 @@ function showZipSetup(reasonText) {
                 if (data.ok) {
                     hasFolder = false;
                     updateProfileStatusUI("Nessun profilo caricato", false);
-                    showZipSetup("Sessione del profilo eliminata con successo. Carica un nuovo dazn_session.json per continuare.");
+                    showZipSetup("Sessione del profilo eliminata con successo. Carica un nuovo chrome_profile.zip per continuare.");
                 } else {
                     alert("Errore durante l'eliminazione: " + (data.error || "Errore sconosciuto"));
                 }
@@ -1141,7 +1141,8 @@ function showZipSetup(reasonText) {
             try {
                 window.__extractedEntries = [];
                 const res = await fetch('/api/events');
-                const data = await res.json();
+                const rawJson = await res.text();
+                const data = JSON.parse(rawJson);
                 const container = document.getElementById('extracted-container');
                 container.innerHTML = '';
                 
@@ -1224,9 +1225,6 @@ function showZipSetup(reasonText) {
                                     <button class="btn btn-outline-mini extracted-copy" onclick='copyEntry(${eidx}, "keys", "Chiavi copiate!")' title="Copia chiavi DRM">
                                         <i class="fa-solid fa-key me-1"></i>KEY
                                     </button>
-                                    <button class="btn btn-outline-mini extracted-copy" onclick='copyEntry(${eidx}, "jsonStr", "JSON copiato!")' title="Copia JSON evento">
-                                        <i class="fa-solid fa-code me-1"></i>JSON
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1234,10 +1232,9 @@ function showZipSetup(reasonText) {
                     container.appendChild(col);
                 });
 
-                // Il testo di JSON Completo deve coincidere SEMPRE e al 100% con il file json salvato sul server (es. dazn_event_mpd.json)
-                const fullJson = JSON.stringify(data, null, 3);
-                window.__eventsJson = fullJson;
-                document.getElementById('extracted-json').innerText = fullJson;
+                // JSON Completo = identico, byte per byte, alla risposta dell'API /api/events
+                window.__eventsJson = rawJson;
+                document.getElementById('extracted-json').innerText = rawJson;
             } catch (err) {
                 console.error(err);
                 document.getElementById('extracted-container').innerHTML = `<div class="col-12 text-danger text-center">Errore nel caricamento: ${err.message}</div>`;
@@ -1297,7 +1294,7 @@ function showZipSetup(reasonText) {
                 card.style.opacity = '0.35';
                 card.style.pointerEvents = 'none';
             }
-            const toast = createToast('Elimino evento in corso...');
+            const toast = createToast('Elimino evento in corso...', 'Eliminazione evento in corso...');
             try {
                 const res = await fetch('/api/events/delete', {
                     method: 'POST',
@@ -1323,7 +1320,7 @@ function showZipSetup(reasonText) {
 
         async function deleteAllEvents() {
             if (!confirm("ATTENZIONE: Sei sicuro di voler eliminare TUTTI gli eventi salvati?")) return;
-            const toast = createToast('Elimino tutti gli eventi...');
+            const toast = createToast('Elimino tutti gli eventi...', 'Eliminazione di tutti gli eventi in corso...');
             try {
                 const res = await fetch('/api/events/delete', {
                     method: 'POST',
@@ -1380,6 +1377,20 @@ function showZipSetup(reasonText) {
                 return false;
             }
             return false;
+        }
+
+        function refreshData() {
+            ctCache.live = null;
+            ctCache.linear = null;
+            ctCache.vod = null;
+            loadExtracted();
+            const activeTab = document.querySelector('#viewTabs .nav-link.active');
+            const target = activeTab ? (activeTab.dataset.bsTarget || activeTab.getAttribute('data-bs-target')) : '';
+            if (target === '#live-pane') loadLive();
+            else if (target === '#vod-pane') loadVod();
+            else if (target === '#linear-pane') loadLinear();
+            updateSessionTimer();
+            showCopyToast('Dati aggiornati!', false);
         }
 
         function showRetry(container, label, retryFn) {
@@ -1667,7 +1678,7 @@ function showZipSetup(reasonText) {
             }
         }
 
-        function createToast(title) {
+        function createToast(title, desc) {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = 'extract-toast loading';
@@ -1677,7 +1688,7 @@ function showZipSetup(reasonText) {
                 </div>
                 <div class="toast-content">
                     <div class="toast-title">${title}</div>
-                    <div class="toast-desc">Estrazione chiavi e MPD in corso...</div>
+                    <div class="toast-desc">${desc || 'Estrazione chiavi e MPD in corso...'}</div>
                 </div>
             `;
             container.appendChild(toast);
@@ -1714,7 +1725,7 @@ function showZipSetup(reasonText) {
 
         async function extractItem(id, asset_id, encodedTitle, encodedImage = '', encodedComp = '', encodedStart = '', encodedEnd = '') {
             if (!hasFolder) {
-                showZipSetup("Per estrarre devi prima caricare il file dazn_session.json di questo profilo. Caricalo qui sotto, poi riprova l'estrazione.");
+                showZipSetup("Per estrarre devi prima caricare il file chrome_profile.zip di questo profilo. Caricalo qui sotto, poi riprova l'estrazione.");
                 return;
             }
             const title = decodeURIComponent(encodedTitle);
@@ -1862,7 +1873,7 @@ function showCopyToast(msg, isError) {
             if (remaining < 1800) {
                 timerTextElem.className = "text-danger fw-bold";
             } else if (remaining < 7200) {
-                timerTextElem.className = "text-warning fw-bold";
+                timerTextElem.className = "text-success fw-bold";
             } else {
                 timerTextElem.className = "text-success fw-bold";
             }
