@@ -18,17 +18,29 @@ class BrowserManager:
         self._context = None
         self._page = None
         self._playwright = None
+        self._user_data_dir = None
 
     @property
     def page(self):
         return self._page
 
+    @property
+    def context(self):
+        """Contesto del browser.
+
+        Esposto perche' context.request e' un APIRequestContext che ri usa i
+        cookie di sessione senza dover navigare su dazn.com: serve al server
+        licenze DRM, che risponde 403 "Device not allowed" senza quei cookie.
+        """
+        return self._context
+
     async def start(self, user_data_dir: Path = None):
         from playwright.async_api import async_playwright
         self._playwright = await async_playwright().start()
         
-        p_dir = user_data_dir or get_active_profile_dir()
+        p_dir = Path(user_data_dir) if user_data_dir else Path(get_active_profile_dir())
         p_dir.mkdir(parents=True, exist_ok=True)
+        self._user_data_dir = p_dir
 
         launch_args = [
             '--no-sandbox',
@@ -223,14 +235,53 @@ class BrowserManager:
                 await self._playwright.stop()
         except Exception:
             pass
+        self._context = None
+        self._page = None
+        self._playwright = None
 
 _browser_instance = None
 
+# Lock di avvio, uno per event loop: il warmup del server e l'estrazione
+# possono chiedere il browser insieme e senza lock creerebbero due istanze
+# (o leggerebbero _user_data_dir prima che esista).
+_start_locks = {}
+
+
+def _get_start_lock():
+    loop = asyncio.get_running_loop()
+    lk = _start_locks.get(id(loop))
+    if lk is None:
+        lk = asyncio.Lock()
+        _start_locks[id(loop)] = lk
+    return lk
+
+
 async def get_browser(user_data_dir: Path = None) -> BrowserManager:
     global _browser_instance
-    if user_data_dir:
-        set_active_profile_dir(user_data_dir)
-    if _browser_instance is None:
-        _browser_instance = BrowserManager()
-        await _browser_instance.start(user_data_dir=user_data_dir)
-    return _browser_instance
+    async with _get_start_lock():
+        if user_data_dir:
+            set_active_profile_dir(user_data_dir)
+            # Il contesto porta i cookie di sessione del profilo: riusarne uno di
+            # un altro profilo fa fallire il server licenze (403 "Device not
+            # allowed"). Se il profilo richiesto e' diverso si riavvia.
+            if _browser_instance is not None and _browser_instance._user_data_dir is not None:
+                if Path(_browser_instance._user_data_dir) != Path(user_data_dir):
+                    try:
+                        await _browser_instance.close()
+                    except Exception:
+                        pass
+                    _browser_instance = None
+        if _browser_instance is None:
+            inst = BrowserManager()
+            try:
+                await inst.start(user_data_dir=user_data_dir)
+            except Exception:
+                # Un'istanza mezza avviata (contesto None) farebbe fallire
+                # ogni richiesta successiva: si butta via e si ripropora' dopo.
+                try:
+                    await inst.close()
+                except Exception:
+                    pass
+                raise
+            _browser_instance = inst
+        return _browser_instance

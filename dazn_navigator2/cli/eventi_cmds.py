@@ -1,5 +1,6 @@
 """Gestione eventi in dazn_event.json locale (nessun deploy su GitHub)."""
 import json
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from rich.console import Console
@@ -60,27 +61,75 @@ def _normalize_ua(data):
     return data
 
 
-def pubblica(messaggio="", data=None):
-    """Salva in locale nel file dazn_event.json e sincronizza su Upstash Redis stream:eventi_mpd."""
-    if data is None:
-        data = _load()
-    data = _normalize_ua(data)
-    _save(data)
+_push_lock = threading.Lock()
+_push_pending = None
+_push_thread = None
+
+
+def _upstash_set(payload):
+    """Scrive lo stato su Upstash. Ritorna True/False, non alza mai."""
     try:
         import requests
         upstash_url = "https://ace-seal-162556.upstash.io"
         upstash_token = "gQAAAAAAAnr8AAIgcDEyZjRkYjEwYmUzZDY0M2RhYjZkNjhmMDFjNGVkMjVmYw"
         headers = {"Authorization": f"Bearer {upstash_token}"}
-        payload = json.dumps(data, ensure_ascii=False)
-        requests.post(f"{upstash_url}/set/stream:eventi_mpd", headers=headers, data=payload, timeout=10)
+        requests.post(f"{upstash_url}/set/stream:eventi_mpd", headers=headers,
+                      data=payload, timeout=10)
+        return True
     except Exception:
-        pass
+        return False
+
+
+def _push_worker():
+    global _push_pending
+    while True:
+        with _push_lock:
+            payload = _push_pending
+            _push_pending = None
+        if payload is None:
+            return
+        _upstash_set(payload)
+
+
+def _push_async(payload):
+    """Mette in coda l'ultimo stato senza bloccare chi chiama.
+
+    La chiave Upstash e' un overwrite completo, quindi gli stati intermedi
+    sono superflui: si tiene solo l'ultimo payload e si manda quello.
+    """
+    global _push_pending, _push_thread
+    with _push_lock:
+        _push_pending = payload
+        if _push_thread is None or not _push_thread.is_alive():
+            _push_thread = threading.Thread(target=_push_worker, daemon=True)
+            _push_thread.start()
+
+
+def pubblica(messaggio="", data=None, asincrono=False):
+    """Salva in locale nel file dazn_event.json e sincronizza su Upstash Redis stream:eventi_mpd.
+
+    asincrono=True (per il sito) rimanda il push a Upstash in background: il
+    click su "Estrai" non aspetta i ~2.5s della rete. Il file locale resta
+    scritto in modo sincrono, quindi la lista e' subito aggiornata.
+    """
+    if data is None:
+        data = _load()
+    data = _normalize_ua(data)
+    _save(data)
+    payload = json.dumps(data, ensure_ascii=False)
+    if asincrono:
+        _push_async(payload)
+        console.print(f"[green]Salvato in locale ({EVENTS_FILE.name}); push Upstash in corso.[/green]")
+        return
+    _upstash_set(payload)
     console.print(f"[green]Salvato in locale ({EVENTS_FILE.name}) e su Upstash.[/green]")
 
 
 def flush_alla_chiusura():
-    """Nessuna operazione pendente: tutto e' gia' salvato in locale."""
-    pass
+    """Attende l'eventuale push a Upstash ancora in coda."""
+    t = _push_thread
+    if t is not None and t.is_alive():
+        t.join(timeout=5)
 
 
 def _iter_entries(data):
@@ -91,14 +140,14 @@ def _iter_entries(data):
             n += 1
 
 
-def add_event(comp_title, entry, pid=None):
+def add_event(comp_title, entry, pid=None, asincrono=False):
     """Aggiunge/sostituisce un evento (dedup per titolo) e salva in locale."""
     data = _load()
     comp_title = comp_title or "Eventi"
     grp = data.setdefault(comp_title, [])
     grp[:] = [e for e in grp if e.get("name") != entry.get("name")]
     grp.append(entry)
-    pubblica(data=data)
+    pubblica(data=data, asincrono=asincrono)
 
 
 def ripara_user_agent(data=None, pubblica_risultato=True):

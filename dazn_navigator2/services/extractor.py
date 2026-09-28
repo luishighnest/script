@@ -50,6 +50,34 @@ DEVICE_ID_FILE = Path(__file__).resolve().parent.parent.parent / "saved_profiles
 # Sessione HTTP globale persistente con connection pooling
 _GLOBAL_SESSION = None
 
+# ─── Velocita': quanto token resta considerato "buono" ────────────────────
+# Sotto TOKEN_MIN_LIFE_S il token e' scaduto o in scadenza: si passa dal
+# profilo su disco al browser (l'unica fonte che puo' rinnovarlo davvero).
+TOKEN_MIN_LIFE_S = 300
+# Sopra TOKEN_REFRESH_THRESHOLD non si chiama RefreshAccessToken: il token
+# dura ore, rifarlo a ogni estrazione costa una chiamata di rete, la
+# riscrittura dei file del profilo e un commit/push su GitHub.
+TOKEN_REFRESH_THRESHOLD = 3600
+
+
+def _push_token_in_background(target_p):
+    """Committa il token aggiornato senza bloccare la richiesta HTTP.
+
+    sync_to_github() esegue git add/commit/push: in mezzo alla richiesta di
+    estrazione aggiunge secondi di attesa all'utente per un file che puo'
+    aspettare. Se il thread fallisce pazienza: il token e' gia' su disco.
+    """
+    def _worker():
+        try:
+            from app import sync_to_github
+            sync_to_github(f"auto-refresh: aggiornato token JWT per {target_p.name}")
+        except Exception:
+            pass
+    try:
+        threading.Thread(target=_worker, daemon=True).start()
+    except Exception:
+        pass
+
 # ─── User-Agent: unica fonte di verità per MPD e segmenti ───────────────
 # Il token CDN di DAZN (JWT nel path /@token/ o header dazn-token) contiene
 # il claim "headers":["user-agent"]: la CDN rifiuta (HTTP 401) qualsiasi
@@ -417,43 +445,88 @@ class HeadlessExtractor:
         # 3. Fallback: non pescare da altri profili se il profilo corrente ha un token specifico
         return ""
 
-    async def _get_page_and_jwt(self, profile_dir=None):
-        """Recupera il page object e JWT dal BrowserManager o direttamente dal profilo."""
+    async def _get_page_and_jwt(self, profile_dir=None, force_browser=False):
+        """Recupera il page object e JWT dal profilo, o dal browser se serve.
+
+        Percorso veloce: se il profilo su disco ha gia' un token valido non si
+        avvia affatto il browser. Lanciarlo costa ~6s di context + ~17s di
+        navigazione su dazn.com per ogni evaluate() (che richiama
+        ensure_session()), e il suo localStorage restituisce spesso 'None'
+        anche quando il token su disco e' perfettamente valido: 30s sprecati
+        per arrivare allo stesso token che si legge in 0.02s.
+        """
         from dazn_navigator2.services.browser import get_browser, set_active_profile_dir
+        from dazn_navigator2.settings import get_setting
         target_p = Path(profile_dir) if profile_dir else None
         self._profile_dir = target_p
+        self._browser_used = False
         if target_p:
             set_active_profile_dir(target_p)
 
-        b = await get_browser(user_data_dir=target_p)
+        engine = get_setting("extraction_engine")
+        need_page = force_browser or (engine == "headless")
+
+        # ─── FAST PATH: token valido gia' su disco, nessun browser ───
         jwt = ""
-
-        # 1) Prima tenta di leggere il token di sessione live direttamente dal browser (localStorage)
-        if b:
-            await b.ensure_session()
-            jwt_browser = await b.evaluate("localStorage.getItem('MISL.authToken')")
-            pl_b = self._decode_jwt_payload(jwt_browser) if jwt_browser and jwt_browser.startswith("eyJ") else None
-            if pl_b and pl_b.get("exp", 0) > time.time():
-                jwt = jwt_browser
-                console.print("[dim]  -> Token DAZN rinfrescato tramite browser[/dim]")
-
-        # 2) Fallback su auth_token.json / leveldb se il browser non ha restituito un token valido
-        if not jwt:
+        if target_p and not force_browser:
             jwt_disk = self._read_jwt_from_disk(target_p)
             if jwt_disk and jwt_disk.startswith("eyJ"):
                 pl = self._decode_jwt_payload(jwt_disk)
-                if pl:
+                if pl and int(pl.get("exp", 0)) - time.time() > TOKEN_MIN_LIFE_S:
                     jwt = jwt_disk
-                    did_jwt = pl.get("deviceId", "").split("|")[0].strip()
+                    did_jwt = (pl.get("deviceId") or "").split("|")[0].strip()
                     if did_jwt:
                         self._real_device_id = did_jwt
                     c_val = pl.get('country') or pl.get('contentCountry') or 'it'
                     console.print(
-                        f"[dim]  -> Token DAZN valido dal profilo (country={c_val}, "
-                        f"scade tra {int(pl.get('exp', 0) - time.time())}s)[/dim]"
+                        f"[dim]  -> Token dal profilo (country={c_val}, valido "
+                        f"{int(pl.get('exp', 0) - time.time()) // 60} min) - browser saltato[/dim]"
                     )
 
-        if jwt:
+        b = None
+        if need_page or not jwt:
+            self._browser_used = True
+            b = await get_browser(user_data_dir=target_p)
+            if b:
+                await b.ensure_session()
+            # 1) token di sessione live dal browser (localStorage)
+            if b and not jwt:
+                jwt_browser = await b.evaluate("localStorage.getItem('MISL.authToken')")
+                pl_b = self._decode_jwt_payload(jwt_browser) if jwt_browser and jwt_browser.startswith("eyJ") else None
+                if pl_b and pl_b.get("exp", 0) > time.time():
+                    jwt = jwt_browser
+                    console.print("[dim]  -> Token DAZN rinfrescato tramite browser[/dim]")
+                elif not jwt:
+                    # 2) fallback su auth_token.json / leveldb
+                    jwt_disk = self._read_jwt_from_disk(target_p)
+                    if jwt_disk and jwt_disk.startswith("eyJ"):
+                        pl = self._decode_jwt_payload(jwt_disk)
+                        if pl and int(pl.get("exp", 0)) - time.time() > TOKEN_MIN_LIFE_S:
+                            jwt = jwt_disk
+                            console.print("[dim]  -> Token DAZN valido dal profilo (browser)[/dim]")
+
+        if not jwt or not jwt.startswith("eyJ"):
+            raise RuntimeError(
+                "JWT Italia valido non trovato nel profilo DAZN. Il token salvato è scaduto o "
+                "appartiene ad un account non italiano. Riesegui l'estrazione con una sessione "
+                "italiana attiva oppure carica il profilo corretto."
+            )
+
+        pl = self._decode_jwt_payload(jwt)
+        if pl:
+            did_jwt = (pl.get("deviceId") or "").split("|")[0].strip()
+            if did_jwt:
+                self._real_device_id = did_jwt
+            console.print(
+                f"[dim]  -> JWT usato per Playback: country={pl.get('country')}, "
+                f"exp in {int(pl.get('exp', 0) - time.time())}s[/dim]"
+            )
+
+        # ─── Refresh solo se il token sta davvero per scadere ───
+        # RefreshAccessToken porta a 24h: rifarlo a ogni estrazione e' uno
+        # spreco di rete, scrittura su disco e commit/push su GitHub.
+        remaining = int(pl.get("exp", 0) - time.time()) if pl else 0
+        if jwt and 0 < remaining < TOKEN_REFRESH_THRESHOLD:
             try:
                 client = await _get_http_session()
                 res_ref = await client.post(
@@ -479,30 +552,10 @@ class HeadlessExtractor:
                                         s_file.write_text(json.dumps(data_s, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
                                     except Exception:
                                         pass
-                            try:
-                                from app import sync_to_github
-                                sync_to_github(f"auto-refresh: aggiornato token JWT per {target_p.name}")
-                            except Exception:
-                                pass
+                        # Il push su GitHub blocca la risposta HTTP: va in background.
+                        _push_token_in_background(target_p)
             except Exception as e_ref:
                 console.print(f"[dim]  -> Avviso RefreshAccessToken: {e_ref}[/dim]")
-
-        if not jwt or not jwt.startswith("eyJ"):
-            raise RuntimeError(
-                "JWT Italia valido non trovato nel profilo DAZN. Il token salvato è scaduto o "
-                "appartiene ad un account non italiano. Riesegui l'estrazione con una sessione "
-                "italiana attiva oppure carica il profilo corretto."
-            )
-
-        pl = self._decode_jwt_payload(jwt)
-        if pl:
-            did_jwt = pl.get("deviceId", "").split("|")[0].strip()
-            if did_jwt:
-                self._real_device_id = did_jwt
-            console.print(
-                f"[dim]  -> JWT usato per Playback: country={pl.get('country')}, "
-                f"exp in {int(pl.get('exp', 0) - time.time())}s[/dim]"
-            )
 
         if not getattr(self, "_real_device_id", None) and b:
             try:
@@ -649,7 +702,83 @@ class HeadlessExtractor:
                             pass
             return {"ok": False, "error": str(e)}
 
+    @staticmethod
+    async def _post_license(sender, la_url, chal, did_variants, user_agents, header_fn, timeout):
+        """POST della challenge al server licenze via curl o APIRequestContext.
+
+        Un solo posto per i due trasporti: response.status (APIRequestContext) e
+        response.status_code (curl) vanno normalizzati, e il timeout e' in ms
+        nel primo caso e in secondi nel secondo.
+
+        Ritorna {"ok": True, "body": <base64>} oppure l'ultimo errore.
+        """
+        import base64 as _b64
+        last = None
+        for lic_ua in user_agents:
+            if not lic_ua:
+                continue
+            for cand_id in did_variants:
+                headers = header_fn(cand_id, lic_ua)
+                try:
+                    resp = await sender.post(la_url, headers=headers, data=chal, timeout=timeout)
+                    # APIRequestContext espone .status, curl espone .status_code
+                    status = getattr(resp, "status", None)
+                    if status is None:
+                        status = getattr(resp, "status_code", 0)
+                    if status == 200:
+                        body = await resp.body() if hasattr(resp, "body") else resp.content
+                        return {"ok": True, "body": _b64.b64encode(body).decode("ascii")}
+                    text = await resp.text() if hasattr(resp, "text") else ""
+                    hdrs = dict(getattr(resp, "headers", {}) or {})
+                    last = {"ok": False, "status": status, "bodyText": text, "headers": hdrs,
+                            "browser_res": last}
+                except Exception as ex:
+                    last = {"ok": False, "error": str(ex), "browser_res": last}
+            if last and last.get("ok"):
+                return last
+        return last or {"ok": False, "error": "nessun tentativo eseguito"}
+
+    async def _browser_request_context(self, only_if_running=False):
+        """APIRequestContext del browser SENZA navigare su dazn.com.
+
+        Serve al server licenze, che rifiuta (403 "Device not allowed") le
+        richieste senza i cookie di sessione registrati nel profilo. Non
+        serve pero' aprire la home: page.request e' legato al contesto, non
+        alla pagina, quindi si paga solo l'avvio del contesto e non i ~25s di
+        navigazione + sleep che fa ensure_session().
+
+        only_if_running=True non avvia nulla: restituisce None se il contesto
+        non e' gia' vivo, cosi da non pagare un launch solo per una prova.
+        """
+        from dazn_navigator2.services import browser as _brmod
+        from dazn_navigator2.services.browser import get_browser
+        if only_if_running:
+            inst = getattr(_brmod, "_browser_instance", None)
+            if inst is None or inst.context is None:
+                return None
+            return inst.context.request
+        try:
+            b = await get_browser(user_data_dir=self._profile_dir)
+            if b is not None and b.context is not None:
+                return b.context.request
+        except Exception as e:
+            console.print(f"[dim]  -> Contesto browser non disponibile: {e}[/dim]")
+        return None
+
     async def estrai(self, profile_dir, asset_id, titolo="") -> dict:
+        """Estrazione veloce: profilo su disco, senza browser se il token e' valido.
+
+        Se il percorso rapido fallisce e il browser non e' mai stato avviato, il
+        tentativo viene ripetuto usando il browser: il fallback esiste, ma
+        costa ~30s e quindi viene eseguito solo quando serve davvero.
+        """
+        res = await self._estrai_core(profile_dir, asset_id, titolo, force_browser=False)
+        if res.get("ok") or getattr(self, "_browser_used", False):
+            return res
+        console.print("[dim]  -> Percorso rapido fallito, retry con browser...[/dim]")
+        return await self._estrai_core(profile_dir, asset_id, titolo, force_browser=True)
+
+    async def _estrai_core(self, profile_dir, asset_id, titolo="", force_browser=False) -> dict:
         """Estrae MPD, PSSH, licenza e chiavi in modo istantaneo."""
         global _CACHED_SERVICES, _CACHED_CDM
         self.result = {"ok": False, "mpd_url": None, "pssh": None, "keys": None, "ua": None, "error": None}
@@ -660,7 +789,7 @@ class HeadlessExtractor:
 
         import time
         _t = time.time()
-        page, jwt = await self._get_page_and_jwt(profile_dir)
+        page, jwt = await self._get_page_and_jwt(profile_dir, force_browser=force_browser)
         console.print(f"[dim]  -> 1. Get JWT: {time.time() - _t:.2f}s[/dim]")
 
         pl_jwt = self._decode_jwt_payload(jwt) or {}
@@ -930,21 +1059,10 @@ class HeadlessExtractor:
         lr = None
         client = await _get_http_session()
 
-        for cand_id in did_variants:
-            lic_hdrs = {
+        def _lic_headers(cand_id, lic_ua):
+            return {
                 "content-type": "application/octet-stream",
-                "user-agent": ua,
-                "authorization": f"Bearer {jwt}",
-                "dazn-token": dazn_token,
-                "x-dazn-token": dazn_token,
-                "x-brand": "DAZN",
-                "x-daznid": cand_id,
-                "x-dazn-device": cand_id,
-                "x-correlation-id": str(_uuid.uuid4()),
-            }
-            lic_hdrs_clean = {
-                "content-type": "application/octet-stream",
-                "user-agent": ua,
+                "user-agent": lic_ua,
                 "authorization": f"Bearer {jwt}",
                 "dazn-token": dazn_token,
                 "x-dazn-token": dazn_token,
@@ -954,42 +1072,21 @@ class HeadlessExtractor:
                 "x-correlation-id": str(_uuid.uuid4()),
             }
 
-            if page:
-                try:
-                    # Prima l'UA reale della sessione (coerente con il token
-                    # CDN); l'UA Android del player resta il fallback.
-                    for lic_ua in (ua, ANDROID_PLAYER_UA):
-                        if not lic_ua:
-                            continue
-                        lic_hdrs["user-agent"] = lic_ua
-                        lic_resp = await page.request.post(
-                            la_url,
-                            headers=lic_hdrs,
-                            data=chal
-                        )
-                        if lic_resp.ok:
-                            lr = {"ok": True, "body": base64.b64encode(await lic_resp.body()).decode("ascii")}
-                            break
-                        lr = {"ok": False, "status": lic_resp.status, "bodyText": await lic_resp.text()}
-                except Exception as ex:
-                    lr = {"ok": False, "error": f"Browser request exception: {ex}"}
-            else:
-                try:
-                    lic_resp = await client.post(la_url, headers=lic_hdrs, data=chal, timeout=10)
-                    if lic_resp.status_code == 200:
-                        lr = {"ok": True, "body": base64.b64encode(lic_resp.content).decode("ascii")}
-                        break
-                    else:
-                        lr = {
-                            "ok": False,
-                            "status": lic_resp.status_code,
-                            "bodyText": lic_resp.text,
-                            "headers": dict(lic_resp.headers),
-                            "browser_res": lr
-                        }
-                except Exception as e:
-                    if not lr:
-                        lr = {"ok": False, "error": str(e)}
+        # ─── Trasporto per la licenza ───
+        # La licenza DRM e' legata al device registrato nella sessione: senza
+        # i cookie del profilo il server risponde 403 "Device not allowed".
+        # Se il contesto del browser e' gia' vivo si va diretti li (gratis);
+        # altrimenti si prova prima curl (veloce) e il contesto si avvia solo
+        # se curl non basta.
+        req_live = await self._browser_request_context(only_if_running=True)
+        if req_live is not None:
+            lr = await self._post_license(req_live, la_url, chal, did_variants, (ua, ANDROID_PLAYER_UA), _lic_headers, 10000)
+        else:
+            lr = await self._post_license(client, la_url, chal, did_variants, (ua,), _lic_headers, 10)
+            if not (lr and lr.get("ok")):
+                req = await self._browser_request_context()
+                if req is not None:
+                    lr = await self._post_license(req, la_url, chal, did_variants, (ua, ANDROID_PLAYER_UA), _lic_headers, 10000)
 
         if not lr or not lr.get("ok"):
             err_msg = f"Licenza: {lr.get('status','?')} - Motivo: {lr.get('statusText', '')} {lr.get('bodyText', '')[:300]} {lr.get('error', '')}".strip()

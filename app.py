@@ -43,6 +43,10 @@ _VOD_CACHE_TIME = 0
 _VOD_CACHE_TTL = 300
 _VOD_CACHE_LOCK = threading.Lock()
 
+# Ultimo profilo usato dal sito: serve ai thread in background, dove la
+# sessione Flask non e' disponibile.
+_LAST_PID = None
+
 def _start_background_loop(loop):
     asyncio.set_event_loop(loop)
     loop.run_forever()
@@ -1018,6 +1022,8 @@ def extract_stream():
         return jsonify({"ok": False, "error": "Non autenticato"}), 401
 
     pid = session["user_profile_id"]
+    global _LAST_PID
+    _LAST_PID = pid
     body = request.get_json() or {}
     asset_id = body.get("asset_id") or body.get("id")
     title = body.get("title", "Evento")
@@ -1110,7 +1116,7 @@ def extract_stream():
                 "key": keys_str,
                 "ua": ua_str
             }
-            add_event(competition, entry, _current_pid())
+            add_event(competition, entry, _current_pid(), asincrono=True)
             sync_to_github(f"extract: salvato evento {event_name} ({_current_pid()})")
             res["mpd_url"] = mpd_auth
             res["mpd_auth"] = mpd_auth
@@ -1274,7 +1280,7 @@ def _auto_extract_worker():
                                 "key": keys_str,
                                 "ua": ua_str
                             }
-                            add_event(cand["competition"], entry, pid)
+                            add_event(cand["competition"], entry, pid, asincrono=True)
                             sync_to_github(f"auto-extract: {cand['title']} ({cand['competition']})")
                             print(f"[AutoExtract] Estratto e sincronizzato con successo: {cand['title']}")
                             extracted_names.add(cand["title"].lower())
@@ -1291,6 +1297,86 @@ def _auto_extract_worker():
 # Avvia il worker in background
 _auto_thread = threading.Thread(target=_auto_extract_worker, daemon=True)
 _auto_thread.start()
+
+
+def _profilo_con_token():
+    """Primo profilo che ha un JWT italiano valido salvato.
+
+    Serve al warmup: avviare il contesto del profilo sbagliato e' inutile
+    (il server licenze risponde 403 "Device not allowed" con i cookie di un
+    altro profilo) e costa ~6s per niente. Si prova col lettore token
+    dell'estrattore, che e' quello che userà davvero l'estrazione.
+    """
+    from dazn_navigator2.services.extractor import HeadlessExtractor
+    for key in PROFILES:
+        try:
+            d = get_active_chrome_profile(key)
+        except Exception:
+            continue
+        if not d or not Path(d).exists():
+            continue
+        try:
+            if HeadlessExtractor()._read_jwt_from_disk(Path(d)):
+                return d
+        except Exception:
+            continue
+    return None
+
+
+def _bg_profile_dir(pid=None):
+    """Directory del profilo risolta SENZA la sessione Flask.
+
+    Serve ai thread in background (warmup, auto-extract): li' non esiste una
+    richiesta attiva, quindi session['user_profile_id'] solleva. Si usa
+    l'ultimo profilo usato dal sito e, se non c'e', il primo che ha un token
+    italiano valente gia' salvato su disco.
+
+    Non e' _resolve_profile_dir(): quello risolve un path di configurazione,
+    non un id profilo, e rientrare qui da get_active_chrome_profile
+    ricorserebbe all'infinito.
+    """
+    for cand in (pid, _LAST_PID):
+        if cand and cand in PROFILES:
+            try:
+                d = get_active_chrome_profile(cand)
+                if d:
+                    return d
+            except Exception:
+                pass
+    return _profilo_con_token()
+
+
+def _warmup_browser_context(pid=None):
+    """Tieni pronto il contesto del browser in background.
+
+    Il server licenze DRM accetta la richiesta solo con i cookie di sessione
+    del profilo, quindi serve il contesto del browser. Avviarlo costa ~6s: se
+    lo si fa qui, il primo click su "Estrai" non deve aspettarlo (si scende
+    da ~9s a ~1s). Non naviga su dazn.com e non blocca l'avvio del server.
+
+    Usa _bg_profile_dir() e non _current_pid(): qui non c'e' una richiesta
+    Flask attiva, quindi session['user_profile_id'] non esiste e il profilo va
+    risolto dal disco.
+    """
+    try:
+        profile = _bg_profile_dir(pid)
+        if not profile:
+            return
+
+        async def _warm():
+            from dazn_navigator2.services.browser import get_browser
+            try:
+                await get_browser(user_data_dir=Path(profile))
+            except Exception as e:
+                print(f"[Warmup] Contesto browser non avviato: {e}")
+
+        run_async(_warm(), timeout=45)
+    except Exception as e:
+        print(f"[Warmup] Saltato: {e}")
+
+
+if not os.environ.get("SCRIPT2_NO_WARMUP"):
+    threading.Thread(target=_warmup_browser_context, daemon=True).start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
