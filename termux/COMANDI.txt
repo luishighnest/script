@@ -7,7 +7,7 @@ Apri Termux e incolla:
 
   termux-setup-storage
   pkg update -y && pkg upgrade -y
-  pkg install -y python pip cloudflared git curl
+  pkg install -y python cloudflared git curl
   git clone https://github.com/luishighnest/script2.git $HOME/script2
   bash $HOME/script2/termux/setup_termux.sh
 

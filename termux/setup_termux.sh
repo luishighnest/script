@@ -11,7 +11,7 @@ echo "[1/6] Aggiornamento pacchetti di sistema..."
 pkg update -y && pkg upgrade -y
 
 echo "[2/6] Installazione pacchetti di sistema..."
-pkg install -y python pip cloudflared git curl
+pkg install -y python cloudflared git curl
 
 echo "[3/6] Clonazione/aggiornamento del repo script2..."
 if [ ! -d "$HOME/script2/.git" ]; then
