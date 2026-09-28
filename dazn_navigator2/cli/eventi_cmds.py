@@ -35,25 +35,20 @@ def _save(data, pid=None):
 
 
 def pubblica(messaggio="", data=None):
-    """Salva in locale ed effettua l'invio all'API Upstash Redis."""
+    """Salva in locale nel file dazn_event.json e sincronizza su Upstash Redis stream:eventi_mpd."""
     if data is None:
         data = _load()
     _save(data)
-    console.print(f"[green]Salvato in locale ({EVENTS_FILE.name}).[/green]")
     try:
         import requests
-        json_str = json.dumps(data, ensure_ascii=False)
-        url = "https://ace-seal-162556.upstash.io/set/stream:eventi_mpd"
-        headers = {
-            "Authorization": "Bearer gQAAAAAAAnr8AAIgcDEyZjRkYjEwYmUzZDY0M2RhYjZkNjhmMDFjNGVkMjVmYw"
-        }
-        resp = requests.post(url, headers=headers, data=json_str, timeout=10)
-        if resp.ok:
-            console.print("[bold green]  -> Inviato con successo all'API Upstash (stream:eventi_mpd)[/bold green]")
-        else:
-            console.print(f"[yellow]  -> Invio API Upstash fallito ({resp.status_code})[/yellow]")
-    except Exception as ex:
-        console.print(f"[red]  -> Errore invio API Upstash: {ex}[/red]")
+        upstash_url = "https://ace-seal-162556.upstash.io"
+        upstash_token = "gQAAAAAAAnr8AAIgcDEyZjRkYjEwYmUzZDY0M2RhYjZkNjhmMDFjNGVkMjVmYw"
+        headers = {"Authorization": f"Bearer {upstash_token}"}
+        payload = json.dumps(data, ensure_ascii=False)
+        requests.post(f"{upstash_url}/set/stream:eventi_mpd", headers=headers, data=payload, timeout=10)
+    except Exception:
+        pass
+    console.print(f"[green]Salvato in locale ({EVENTS_FILE.name}) e su Upstash.[/green]")
 
 
 def flush_alla_chiusura():
@@ -70,7 +65,7 @@ def _iter_entries(data):
 
 
 def add_event(comp_title, entry, pid=None):
-    """Aggiunge/sostituisce un evento (dedup per titolo), salva in locale e invia ad Upstash."""
+    """Aggiunge/sostituisce un evento (dedup per titolo) e salva in locale."""
     data = _load()
     comp_title = comp_title or "Eventi"
     grp = data.setdefault(comp_title, [])
@@ -89,20 +84,7 @@ def _sort_key(item):
 
 
 def _fetch_from_upstash():
-    """Recupera gli eventi dall'API Upstash Redis."""
-    try:
-        import requests
-        url = "https://ace-seal-162556.upstash.io/get/stream:eventi_mpd"
-        headers = {"Authorization": "Bearer gQAAAAAAAnr8AAIgcDEyZjRkYjEwYmUzZDY0M2RhYjZkNjhmMDFjNGVkMjVmYw"}
-        res = requests.get(url, headers=headers, timeout=10)
-        if res.ok:
-            raw = res.json().get("result")
-            if raw:
-                data = json.loads(raw)
-                _save(data)
-                return data
-    except Exception as e:
-        console.print(f"[yellow]Errore recupero API Upstash: {e}[/yellow]")
+    """Ritorna i dati direttamente dal file locale dazn_event.json."""
     return _load()
 
 

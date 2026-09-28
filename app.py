@@ -539,6 +539,8 @@ def api_refresh_dazn_session():
 def get_saved_events():
     if "user_profile_id" not in session:
         return jsonify({"error": "Non autenticato"}), 401
+    
+    local_data = _load(_current_pid()) or {}
     try:
         import requests
         url = "https://ace-seal-162556.upstash.io/get/stream:eventi_mpd"
@@ -546,12 +548,22 @@ def get_saved_events():
         res = requests.get(url, headers=headers, timeout=10)
         if res.ok:
             raw = res.json().get("result")
-            if raw:
-                data = json.loads(raw)
-                return jsonify(data)
+            if raw and raw != "null":
+                upstash_data = json.loads(raw)
+                if isinstance(upstash_data, dict) and upstash_data:
+                    merged = dict(upstash_data)
+                    for comp, items in local_data.items():
+                        if comp not in merged:
+                            merged[comp] = items
+                        else:
+                            existing_names = {e.get("name") for e in merged[comp] if isinstance(e, dict)}
+                            for item in items:
+                                if isinstance(item, dict) and item.get("name") not in existing_names:
+                                    merged[comp].append(item)
+                    return jsonify(merged)
     except Exception as e:
         print(f"[Upstash API Error] {e}")
-    return jsonify(_load(_current_pid()))
+    return jsonify(local_data)
 
 @app.route("/api/events/rename", methods=["POST"])
 def rename_saved_event():

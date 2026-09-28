@@ -1,1 +1,44 @@
-{}
+{
+   "Live TV": [
+      {
+         "name": "DAZN 1",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/sxq07q8rseju1j7chnfc7w3if_image-header_pIt_1788259786000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2024-05-23T10:00:00Z",
+         "end": "3000-01-01T00:00:00Z",
+         "mpd": "https://dct-ac-live.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvZGFzaC9kYXpuLWxpbmVhci0yMDYiXSwiZXhjIjpbXSwiaGVhZGVycyI6WyJ1c2VyLWFnZW50Il0sImNvIjp0cnVlLCJpcCI6ZmFsc2UsImFzbiI6WyIxMzMzNSJdLCJzc2lkIjoiYjQwOGQ2MjRiODQzIiwiaW50c2lnIjoiZm9RTklJeVczZHFVVGFjMm02aTlCZlpoU3ppZ2U1NDBKZTZ4cGlMWVVQayIsImlhdCI6MTc5MDU4NTMwMiwiZXhwIjoxNzkwNjcxNzAyfQ.bLo_CfN7rBioXPy3epK9ohc5cCVgecCjmT_Iqmd97Bk/dash/dazn-linear-206/stream.mpd?p=web",
+         "key": "6164a0abaa7c53c6875fa1e7fe0bb463:271510d3e1259571dcc568a232e397eb",
+         "ua": ""
+      }
+   ],
+   "Radio TV Serie A": [
+      {
+         "name": "La Domenica Della Serie A",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/76lung3z9csmzm9csb72yy03c_image-header_pIt_1787147085000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2026-09-27T12:30:00Z",
+         "end": "2026-09-27T15:10:00Z",
+         "mpd": "https://dca-ac-vod.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvY3YzMHJjdWllZWYzMTJla3FjeDUxeDBkbCJdLCJleGMiOltdLCJoZWFkZXJzIjpbInVzZXItYWdlbnQiXSwiY28iOnRydWUsImlwIjpmYWxzZSwiYXNuIjpbIjEzMzM1Il0sInNzaWQiOiJiNDA4ZDYyNGI4NDMiLCJpbnRzaWciOiJmb1FOSUl5VzNkcVVUYWMybTZpOUJmWmhTemlnZTU0MEplNnhwaUxZVVBrIiwiaWF0IjoxNzkwNTg0MDg2LCJleHAiOjE3OTA2NzA0ODZ9.8CRUEJx-GT3bNnRYUD4VwfxSxBmVxEMJBX386k-eQl0/cv30rcuieef312ekqcx51x0dl/web/stream.mpd?channel=5063&outlet=dazn-italy&plang=it",
+         "key": "cfb5e2b73bef4f3c878f25ab86a7451f:0d6712bf2a84edcc93d001a9613f6fec",
+         "ua": ""
+      },
+      {
+         "name": "Buongiorno Serie A",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/amy45z7y5tkdzulqgnimei1tg_image-header_pIt_1787143867000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2026-09-28T06:00:00Z",
+         "end": "2026-09-28T07:15:00Z",
+         "mpd": "https://dcg-ac-live.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvMXI0bXo4eWY1NWR3dzE0dDZyNXIxbnViODkiXSwiZXhjIjpbXSwiaGVhZGVycyI6WyJ1c2VyLWFnZW50Il0sImNvIjp0cnVlLCJpcCI6ZmFsc2UsImFzbiI6WyIxMzMzNSJdLCJzc2lkIjoiYjQwOGQ2MjRiODQzIiwiaW50c2lnIjoiZm9RTklJeVczZHFVVGFjMm02aTlCZlpoU3ppZ2U1NDBKZTZ4cGlMWVVQayIsImlhdCI6MTc5MDU4NTQyNiwiZXhwIjoxNzkwNjcxODI2fQ.qz5XQ57ZwMQFME6V5040FkjA1c9vahESi6wPRqQKmfs/1r4mz8yf55dww14t6r5r1nub89/web/stream.mpd?channel=5065&outlet=dazn-italy&plang=it",
+         "key": "84793d50ef99549ba9d7c8ec344fc501:a7375e29d44b0e488f70d02bd45df5b9",
+         "ua": ""
+      }
+   ],
+   "FIFA ASEAN Cup": [
+      {
+         "name": "Malaysia vs. Indonesia",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/1q381fz300kca1fww3qjys4zj5_image-header_pIt_1790236100000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2026-09-28T12:30:00Z",
+         "end": "2026-09-28T15:00:00Z",
+         "mpd": "https://dca-ac-live.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvMWxwdWFrcWljc3Y4azExam5menI3dTVoajIiXSwiZXhjIjpbXSwiaGVhZGVycyI6WyJ1c2VyLWFnZW50Il0sImNvIjp0cnVlLCJpcCI6ZmFsc2UsImFzbiI6WyIxMzMzNSJdLCJzc2lkIjoiYjQwOGQ2MjRiODQzIiwiaW50c2lnIjoiZm9RTklJeVczZHFVVGFjMm02aTlCZlpoU3ppZ2U1NDBKZTZ4cGlMWVVQayIsImlhdCI6MTc5MDU5ODIzNSwiZXhwIjoxNzkwNjg0NjM1fQ.nEFBSv3Hg9VLDUrYxdfl2OJ_zFx5X-1-jSUxRqIfUW8/1lpuakqicsv8k11jnfzr7u5hj2/web/stream.mpd?channel=5073&outlet=dazn-italy&plang=it",
+         "key": "1f8e53d8a74d5345ac0ed2dc487cf1e7:1514c107b4ff97d1bb031c2899472ea7",
+         "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      }
+   ]
+}
