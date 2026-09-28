@@ -26,7 +26,7 @@ echo "[4/6] Dipendenze Python (pacchetto per pacchetto, senza bloccare)..."
 
 skip_pkg() {
   case "$1" in
-    playwright*|gunicorn*) return 0 ;;
+    playwright*|gunicorn*|curl_cffi*) return 0 ;;
     *) return 1 ;;
   esac
 }
