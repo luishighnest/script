@@ -1,1 +1,13 @@
-{}
+{
+   "Radio TV Serie A": [
+      {
+         "name": "La Domenica Della Serie A",
+         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/76lung3z9csmzm9csb72yy03c_image-header_pIt_1787147085000/fill/none/top/none/100/1280/720/png/image",
+         "start": "2026-09-27T12:30:00Z",
+         "end": "2026-09-27T15:10:00Z",
+         "mpd": "https://dca-ac-vod.cdn.indazn.com/@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InV1aWRfMSJ9.eyJwYXRocyI6WyIvY3YzMHJjdWllZWYzMTJla3FjeDUxeDBkbCJdLCJleGMiOltdLCJoZWFkZXJzIjpbInVzZXItYWdlbnQiXSwiY28iOnRydWUsImlwIjpmYWxzZSwiYXNuIjpbIjEzMzM1Il0sInNzaWQiOiJiNDA4ZDYyNGI4NDMiLCJpbnRzaWciOiJmb1FOSUl5VzNkcVVUYWMybTZpOUJmWmhTemlnZTU0MEplNnhwaUxZVVBrIiwiaWF0IjoxNzkwNTU0NDg5LCJleHAiOjE3OTA2NDA4ODl9.6q6McrzLxvE8hLj3PZpZZYUYNZgnW7EXWOpykuO1Hoc/cv30rcuieef312ekqcx51x0dl/web/stream.mpd?channel=5063&outlet=dazn-italy&plang=it",
+         "key": "cfb5e2b73bef4f3c878f25ab86a7451f:0d6712bf2a84edcc93d001a9613f6fec",
+         "ua": ""
+      }
+   ]
+}
