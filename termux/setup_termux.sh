@@ -11,7 +11,7 @@ echo "[1/6] Aggiornamento pacchetti di sistema..."
 pkg update -y && pkg upgrade -y
 
 echo "[2/6] Installazione pacchetti di sistema..."
-pkg install -y python cloudflared git curl
+pkg install -y python cloudflared git curl coreutils
 
 echo "[3/6] Clonazione/aggiornamento del repo script2..."
 if [ ! -d "$HOME/script2/.git" ]; then
@@ -40,7 +40,8 @@ while read -r pkg; do
     echo "  [saltato] $pkg  (non serve o senza wheel su Android)"
     continue
   fi
-  if pip install "$pkg" >/dev/null 2>&1; then
+  echo "  [installo] $pkg ..."
+  if timeout 420 pip install "$pkg" >/dev/null 2>&1; then
     echo "  [ok] $pkg"
   else
     echo "  [FALLITO] $pkg"
