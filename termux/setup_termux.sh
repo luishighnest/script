@@ -26,7 +26,8 @@ echo "[4/6] Dipendenze Python (pacchetto per pacchetto, senza bloccare)..."
 
 skip_pkg() {
   case "$1" in
-    playwright*|gunicorn*|curl_cffi*) return 0 ;;
+    playwright*|gunicorn*) return 0 ;;
+    curl_cffi*) echo "  [speciale] $1  -> si compila da sorgente (build_curl_cffi.sh)"; return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -53,10 +54,13 @@ done < requirements.txt
 if [ -n "$FAILED" ]; then
   echo ""
   echo "  [i] Alcuni pacchetti non sono stati installati:$FAILED"
-  echo "      I piu' comuni sono curl_cffi e pydantic (estensione Rust):"
-  echo "      servono i toolchain di Termux, poi si reinstallano:"
+  echo "      curl_cffi (estensione Rust) NON si installa con pip su Android:"
+  echo "      va compilato con libcurl-impersonate (30-60 min, una sola volta):"
+  echo "        pkg install -y rust clang binutils make pkg-config libcurl maturin"
+  echo "        bash \$HOME/script2/termux/build_curl_cffi.sh"
+  echo "      Altri pacchetti Rust (pydantic, pywidevine):"
   echo "        pkg install -y rust clang binutils make pkg-config libcurl"
-  echo "        pip install curl_cffi pydantic"
+  echo "        pip install pydantic pydantic-settings pywidevine"
 fi
 
 echo "[5/6] Browser di fallback per l'estrazione (OPZIONALE)..."
