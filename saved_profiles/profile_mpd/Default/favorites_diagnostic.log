@@ -8,3 +8,14 @@
 2026-09-28 07:23:43.446: [INFO] BookmarksLoadDropped droppedNodes=0
 2026-09-28 07:23:43.446: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
 2026-09-28 07:53:19.976: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-09-28 07:59:14.013: [INFO] CurrentProfilePath: C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default
+2026-09-28 07:59:14.013: [INFO] Profiles total count: 1
+2026-09-28 07:59:14.016: [INFO] Profile: name=Personale path=C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default lastActive=2026-09-28T07:23:43.365Z
+2026-09-28 07:59:14.016: [INFO] LastUsedProfileDir: C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default
+2026-09-28 07:59:14.017: [INFO] MostRecentlyActiveProfile: name=Personale path=C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default lastActive=2026-09-28T07:23:43.365Z
+2026-09-28 07:59:14.017: [INFO] VisibilityChanged: 0
+2026-09-28 07:59:14.172: [INFO] OnDoneLoading sync enabled: 0
+2026-09-28 07:59:14.172: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-09-28 07:59:14.172: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-09-28 07:59:14.172: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-09-28 08:07:27.331: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1

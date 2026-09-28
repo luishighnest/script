@@ -1,5 +1,6 @@
-2026/09/28-09:25:02.187 3fac Creating DB C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db since it was missing.
-2026/09/28-09:25:03.121 3fac Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/09/28-09:25:26.919 136c Level-0 table #5: started
-2026/09/28-09:25:26.931 136c Level-0 table #5: 683284 bytes OK
-2026/09/28-09:25:26.936 136c Delete type=0 #3
+2026/09/28-10:00:13.170 46ac Reusing MANIFEST C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/09/28-10:00:26.204 46ac Recovering log #4
+2026/09/28-10:00:26.233 46ac Reusing old log C:\Users\alecl\Desktop\PROJECT_HUB\core_scripts\script2\saved_profiles\profile_mpd\Default\EdgeCoupons/coupons_data.db/000004.log 
+2026/09/28-10:01:54.329 2cb0 Level-0 table #8: started
+2026/09/28-10:01:54.343 2cb0 Level-0 table #8: 683527 bytes OK
+2026/09/28-10:01:54.355 2cb0 Delete type=0 #4
