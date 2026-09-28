@@ -4,7 +4,13 @@ import sys, json, re, asyncio, subprocess, base64, os, uuid as _uuid, time, thre
 
 from pathlib import Path
 
-from playwright.async_api import async_playwright
+try:
+    from playwright.async_api import async_playwright
+except Exception:
+    # Playwright non disponibile (es. Termux/Android): il server parte lo stesso,
+    # le estrazioni useranno la via veloce curl_cffi e il browser servera' solo
+    # quando installato.
+    async_playwright = None
 from rich.console import Console
 
 console = Console(safe_box=True, highlight=False)

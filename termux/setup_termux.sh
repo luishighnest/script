@@ -20,8 +20,43 @@ else
   git -C "$HOME/script2" pull --rebase
 fi
 
-echo "[4/6] Dipendenze Python (Flask, Playwright, curl_cffi, pywidevine...)..."
-pip install -r "$HOME/script2/requirements.txt"
+echo "[4/6] Dipendenze Python (pacchetto per pacchetto, senza bloccare)..."
+# Su Termux alcune librerie non hanno wheel (playwright, a volte curl_cffi/pydantic):
+# si prova a installare tutto, si segnano i falliti e si va avanti.
+
+skip_pkg() {
+  case "$1" in
+    playwright*|gunicorn*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+cd "$HOME/script2"
+FAILED=""
+while read -r pkg; do
+  pkg="${pkg%%#*}"; pkg="${pkg// /}"
+  [ -z "$pkg" ] && continue
+  if skip_pkg "$pkg"; then
+    echo "  [saltato] $pkg  (non serve o senza wheel su Android)"
+    continue
+  fi
+  if pip install "$pkg" >/dev/null 2>&1; then
+    echo "  [ok] $pkg"
+  else
+    echo "  [FALLITO] $pkg"
+    FAILED="$FAILED
+  - $pkg"
+  fi
+done < requirements.txt
+
+if [ -n "$FAILED" ]; then
+  echo ""
+  echo "  [i] Alcuni pacchetti non sono stati installati:$FAILED"
+  echo "      I piu' comuni sono curl_cffi e pydantic (estensione Rust):"
+  echo "      servono i toolchain di Termux, poi si reinstallano:"
+  echo "        pkg install -y rust clang binutils make pkg-config libcurl"
+  echo "        pip install curl_cffi pydantic"
+fi
 
 echo "[5/6] Browser di fallback per l'estrazione (OPZIONALE)..."
 # La via veloce (curl_cffi) non usa il browser e basta per la maggior parte
