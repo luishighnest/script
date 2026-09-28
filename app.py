@@ -43,6 +43,10 @@ _VOD_CACHE_TIME = 0
 _VOD_CACHE_TTL = 300
 _VOD_CACHE_LOCK = threading.Lock()
 
+# Mette in pausa AutoExtract/estrazione durante le operazioni sul profilo (upload/delete).
+# E' un timestamp con scadenza: si auto-azzera dopo il tempo indicato.
+_PROFILE_BUSY_UNTIL = 0.0
+
 # Ultimo profilo usato dal sito: serve ai thread in background, dove la
 # sessione Flask non e' disponibile.
 _LAST_PID = None
@@ -285,6 +289,42 @@ def _robust_remove_dir(path: Path):
             except Exception:
                 pass
 
+def _kill_edge_for_profile(profile_dir):
+    """Rilascia i file del profilo: chiude il contesto Playwright persistente
+    (warmup) che li tiene mappati e termina eventuali processi Edge headless
+    rimasti appesi (bloccano eliminazione/estrazione del profilo)."""
+    try:
+        async def _close_matching_browser():
+            try:
+                from dazn_navigator2.services.browser import _browser_instance
+                b = _browser_instance
+                if b is not None:
+                    bd = Path(b._user_data_dir or "")
+                    if bd == Path(profile_dir):
+                        await b.close()
+            except Exception:
+                pass
+        run_async(_close_matching_browser(), timeout=30)
+    except Exception as e:
+        print(f"[Browser Close Warning] {e}")
+
+    try:
+        pd = str(Path(profile_dir)).replace("\\", "\\\\")
+        ps_cmd = (
+            "Get-CimInstance Win32_Process | Where-Object { "
+            "$_.Name -eq 'msedge.exe' -and $_.CommandLine -like '*" + pd + "*' } | "
+            "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+        )
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            timeout=30,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        print(f"[Edge Kill Warning] {e}")
+
 # API PER UPLOAD DAZN_SESSION.JSON / JSON SESSION CON AUTO-PUSH SU GITHUB
 @app.route("/api/upload-profile-zip", methods=["POST"])
 def upload_profile_zip():
@@ -302,6 +342,8 @@ def upload_profile_zip():
     pid = session["user_profile_id"]
     profile_dest = UPLOAD_PROFILES_DIR / f"profile_{pid}"
 
+    _PROFILE_BUSY_UNTIL = time.time() + 600
+    _kill_edge_for_profile(profile_dest)
     if profile_dest.exists():
         _robust_remove_dir(profile_dest)
     profile_dest.mkdir(parents=True, exist_ok=True)
@@ -309,11 +351,43 @@ def upload_profile_zip():
     if fname.endswith(".zip"):
         zip_path = profile_dest / "temp_profile.zip"
         uploaded_file.save(str(zip_path))
+        staging = UPLOAD_PROFILES_DIR / f".staging_{pid}"
         try:
+            _kill_edge_for_profile(profile_dest)
+            if staging.exists():
+                _robust_remove_dir(staging)
+            staging.mkdir(parents=True, exist_ok=True)
+
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(profile_dest)
+                zip_ref.extractall(staging)
+
+            # Appiattisce l'eventuale cartella radice unica (es. chrome_profile/)
+            src = staging
+            try:
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    top = {n.split("/", 1)[0] for n in zip_ref.namelist() if n.strip("/")}
+                if len(top) == 1:
+                    cand = staging / next(iter(top))
+                    if cand.is_dir():
+                        src = cand
+            except Exception:
+                pass
+
             zip_path.unlink(missing_ok=True)
+
+            # Sostituisce il profilo con il nuovo contenuto appiattito (senza lock)
+            for _ in range(3):
+                _robust_remove_dir(profile_dest)
+                if not profile_dest.exists():
+                    break
+                time.sleep(0.4)
+
+            profile_dest.mkdir(parents=True, exist_ok=True)
+            for item in list(src.iterdir()):
+                shutil.move(str(item), str(profile_dest / item.name))
+            _robust_remove_dir(staging)
         except Exception as e:
+            _robust_remove_dir(staging)
             return jsonify({"ok": False, "error": f"Errore durante l'estrazione dello zip: {e}"}), 500
     else:
         # File JSON diretto (dazn_session.json o auth_token.json)
@@ -353,6 +427,8 @@ def delete_profile_session():
     pid = session["user_profile_id"]
     profile_dest = UPLOAD_PROFILES_DIR / f"profile_{pid}"
 
+    _PROFILE_BUSY_UNTIL = time.time() + 180
+    _kill_edge_for_profile(profile_dest)
     if profile_dest.exists():
         _robust_remove_dir(profile_dest)
 
@@ -1186,6 +1262,10 @@ def _auto_extract_worker():
     print("[AutoExtract] Servizio estrazione automatica competizioni attivo (Serie A, Serie B, LaLiga).")
     
     while True:
+        if time.time() < _PROFILE_BUSY_UNTIL:
+            # Operazione sul profilo in corso (upload/delete): aspetta senza interferire
+            time.sleep(5)
+            continue
         try:
             async def _check_and_extract():
                 pid = "mpd"  # Salva direttamente nel profilo mpd (sincronizzato con stream:eventi_mpd)
