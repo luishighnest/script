@@ -311,12 +311,16 @@ def _kill_edge_for_profile(profile_dir):
     try:
         async def _close_matching_browser():
             try:
-                from dazn_navigator2.services.browser import _browser_instance
-                b = _browser_instance
+                from dazn_navigator2 import services
+                _brmod = services.browser
+                b = _brmod._browser_instance
                 if b is not None:
                     bd = Path(b._user_data_dir or "")
                     if bd == Path(profile_dir):
                         await b.close()
+                        # Azzera il singleton: una copia chiusa non deve piu'
+                        # essere restituita da get_browser (context=None).
+                        _brmod._browser_instance = None
             except Exception:
                 pass
         run_async(_close_matching_browser(), timeout=30)

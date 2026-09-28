@@ -259,6 +259,12 @@ def _get_start_lock():
 async def get_browser(user_data_dir: Path = None) -> BrowserManager:
     global _browser_instance
     async with _get_start_lock():
+        # Un'istanza chiusa (contesto None) non e' piu' utilizzabile: il
+        # prossimo chiamante riceverebbe un oggetto morto con context=None
+        # (fa fallire "context.pages" con NoneType). Se il processo e' vivo
+        # (warmup) ma il contesto e' stato chiuso, si rilancia da capo.
+        if _browser_instance is not None and _browser_instance._context is None:
+            _browser_instance = None
         if user_data_dir:
             set_active_profile_dir(user_data_dir)
             # Il contesto porta i cookie di sessione del profilo: riusarne uno di
