@@ -1,12 +1,19 @@
 import asyncio
 import sys
+import os
+from pathlib import Path
+
+# Assicura che la cartella genitore sia presente in sys.path
+_BASE_DIR = Path(__file__).resolve().parent.parent
+if str(_BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(_BASE_DIR))
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 
 import signal
-import os
 
 # Gestione immediata e silenziosa di SIGINT (Ctrl+C)
 def _sigint_handler(sig, frame):
@@ -164,6 +171,28 @@ async def _check_session():
 
 app.add_typer(auth_cmds.app, name="auth", help="Autenticazione e gestione token")
 app.add_typer(events_cmds.app, name="nav", help="Navigazione contenuti")
+
+
+@app.command("ripara-ua", help="Verifica e corregge l'User-Agent degli eventi pubblicati (fix 401 CDN)")
+def ripara_ua():
+    from dazn_navigator2.cli.eventi_cmds import ripara_user_agent
+    data, report = ripara_user_agent()
+    if not report:
+        console.print("[yellow]Nessun evento con MPD da verificare.[/yellow]")
+        return
+    for comp, name, old, new, changed in report:
+        if new is None:
+            console.print(f"[red]✗[/red] [{comp}] {name}: nessun User-Agent accettato dalla CDN")
+        elif changed:
+            console.print(f"[green]✓[/green] [{comp}] {name}: UA aggiornato")
+            console.print(f"    [dim]vecchio:[/dim] {old or '(vuoto)'}")
+            console.print(f"    [dim]nuovo  :[/dim] {new}")
+        else:
+            console.print(f"[green]✓[/green] [{comp}] {name}: UA gia' corretto")
+    ok = len([r for r in report if r[3]])
+    fixed = len([r for r in report if r[4]])
+    console.print(f"\n[bold]{ok}/{len(report)}[/bold] eventi con User-Agent verificato sulla CDN"
+                  f" ([bold]{fixed}[/bold] corretti in questo giro).")
 
 
 if __name__ == "__main__":

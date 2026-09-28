@@ -34,10 +34,37 @@ def _save(data, pid=None):
     EVENTS_FILE.write_text(json.dumps(data, indent=3, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def _normalize_ua(data):
+    """Garantisce che ogni evento pubblicato abbia un User-Agent valido.
+
+    Il token CDN DAZN e' vincolato all'UA con cui e' stato creato: se l'addon
+    riceve un 'ua' vuoto (o un UA non di browser) la CDN risponde 401 e il
+    manifest/segmenti non si aprono. Qui si compila solo quando manca, senza
+    toccare gli eventi gia' corretti.
+    """
+    try:
+        from dazn_navigator2.services.extractor import detect_user_agent, _valid_browser_ua
+        default_ua = detect_user_agent()
+    except Exception:
+        return data
+    for items in data.values():
+        if not isinstance(items, list):
+            continue
+        for ev in items:
+            if not isinstance(ev, dict):
+                continue
+            if not ev.get("mpd") and not ev.get("manifest"):
+                continue
+            if not _valid_browser_ua(ev.get("ua") or ""):
+                ev["ua"] = default_ua
+    return data
+
+
 def pubblica(messaggio="", data=None):
     """Salva in locale nel file dazn_event.json e sincronizza su Upstash Redis stream:eventi_mpd."""
     if data is None:
         data = _load()
+    data = _normalize_ua(data)
     _save(data)
     try:
         import requests
@@ -72,6 +99,36 @@ def add_event(comp_title, entry, pid=None):
     grp[:] = [e for e in grp if e.get("name") != entry.get("name")]
     grp.append(entry)
     pubblica(data=data)
+
+
+def ripara_user_agent(data=None, pubblica_risultato=True):
+    """Rilegge ogni evento e riapplica l'User-Agent accettato dalla CDN DAZN.
+
+    Gli eventi estratti con un profilo TLS diverso (o senza 'ua') hanno un
+    token CDN che la CDN rifiuta: si riprovano i candidati e si scrive quello
+    che restituisce HTTP 200.
+
+    Ritorna (data, report) dove ogni voce e' (comp, nome, ua_precedente,
+    ua_verificata, cambiato). events_cmds 'fixed' mostra solo quelli corretti.
+    """
+    from dazn_navigator2.services.extractor import validate_cdn_user_agent, ua_candidates
+    if data is None:
+        data = _load()
+    report = []
+    candidates = ua_candidates()
+    for _, comp, i, ev in _iter_entries(data):
+        mpd = ev.get("mpd") or ev.get("manifest") or ""
+        if not mpd:
+            continue
+        current = (ev.get("ua") or "").strip()
+        found = validate_cdn_user_agent(mpd, ev.get("dazn_token") or "", [current] + candidates)
+        changed = bool(found) and found != current
+        if changed:
+            ev["ua"] = found
+        report.append((comp, ev.get("name", "?"), current, found, changed))
+    if any(r[4] for r in report) and pubblica_risultato:
+        pubblica(data=data)
+    return data, report
 
 
 def _sort_key(item):

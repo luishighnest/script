@@ -565,6 +565,28 @@ def get_saved_events():
         print(f"[Upstash API Error] {e}")
     return jsonify(local_data)
 
+@app.route("/api/events/repair-ua", methods=["POST"])
+def api_repair_event_ua():
+    """Riapplica l'User-Agent accettato dalla CDN a tutti gli eventi salvati.
+
+    Il token CDN e' legato all'UA: se un evento e' stato estratto con un altro
+    profilo TLS la CDN risponde 401 e Kodi non avvia il video.
+    """
+    if "user_profile_id" not in session:
+        return jsonify({"ok": False, "error": "Non autenticato"}), 401
+    from dazn_navigator2.cli.eventi_cmds import ripara_user_agent
+    data, report = ripara_user_agent()
+    return jsonify({
+        "ok": True,
+        "checked": len(report),
+        "fixed": [
+            {"comp": c, "name": n, "old": o, "new": v} for c, n, o, v, ch in report if ch
+        ],
+        "unresolved": [
+            {"comp": c, "name": n, "old": o} for c, n, o, v, ch in report if not v
+        ],
+    })
+
 @app.route("/api/events/rename", methods=["POST"])
 def rename_saved_event():
     if "user_profile_id" not in session:
@@ -962,9 +984,8 @@ def search_events():
 def diagnose():
     import time as _time
     now = _time.time()
-    from dazn_navigator2.services.extractor import PROXY_WORKER, _CACHED_SERVICES
+    from dazn_navigator2.services.extractor import _CACHED_SERVICES
     results = {
-        "_proxy_worker": PROXY_WORKER,
         "_playback_endpoint": _CACHED_SERVICES.get("Playback", ""),
     }
     for pid in PROFILES:
@@ -1068,7 +1089,8 @@ def extract_stream():
             cdn_name = res.get("cdn_name", "dazn-token")
             mpd_auth = _build_mpd_auth(mpd_url, dazn_token, cdn_name)
             keys_str = ",".join(res.get("keys", []))
-            ua_str = res.get("ua", "")
+            from dazn_navigator2.services.extractor import detect_user_agent
+            ua_str = (res.get("ua") or "").strip() or detect_user_agent()
             logo = image or _image_url(res.get("image"))
 
             base_titolo = res.get("titolo") or title
@@ -1104,6 +1126,8 @@ def extract_stream():
 
 @app.route("/playlist.m3u", methods=["GET"])
 def generate_m3u():
+    from dazn_navigator2.services.extractor import detect_user_agent
+    default_ua = detect_user_agent()
     data = _load(_current_pid())
     lines = ["#EXTM3U"]
     for comp, items in data.items():
@@ -1112,91 +1136,20 @@ def generate_m3u():
             logo = ev.get("logo") or ev.get("image", "")
             mpd = ev.get("mpd") or ev.get("manifest", "")
             keys = ev.get("key") or ev.get("keys", "")
-            
+            ua = (ev.get("ua") or "").strip() or default_ua
+
             props = f'#EXTINF:-1 tvg-name="{name}" tvg-logo="{logo}" group-title="{comp}",{name}'
             if keys:
-                lines.append(f'#KODIPROP:inputstream.adaptive.license_key={keys}')
+                # ClearKey: inputstream.adaptive accetta solo drm_legacy
+                # (license_key viene rifiutata -> nessuna chiave -> niente video)
+                lines.append(f'#KODIPROP:inputstream.adaptive.drm_legacy=org.w3.clearkey|{keys.replace("|", ",")}')
+            hdrs = f'User-Agent={ua}&Referer=https://www.dazn.com/&Origin=https://www.dazn.com'
+            lines.append(f'#KODIPROP:inputstream.adaptive.manifest_headers={hdrs}')
+            lines.append(f'#KODIPROP:inputstream.adaptive.stream_headers={hdrs}')
             lines.append(props)
             lines.append(mpd)
     
     return Response("\n".join(lines), mimetype="audio/x-mpegurl")
-
-@app.route("/proxy", methods=["GET"])
-def proxy_stream():
-    import urllib.parse, requests, re
-    target_url = request.args.get("url")
-    if not target_url:
-        return Response("URL mancante", status=400)
-    
-    # DAZN CDN JWT token validates exact browser User-Agent ("headers":["user-agent"]).
-    # Must use the exact Chrome Browser UA instead of Kodi's UA to avoid HTTP 401.
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "Referer": "https://www.dazn.com/",
-        "Origin": "https://www.dazn.com",
-        "Accept": "*/*"
-    }
-    
-    dazn_tok = request.args.get("dazn-token")
-    if dazn_tok:
-        headers["dazn-token"] = dazn_tok
-        
-    def _fetch(url):
-        try:
-            from curl_cffi import requests as c_requests
-            return c_requests.get(url, headers=headers, impersonate="chrome131", stream=True, timeout=15)
-        except Exception:
-            return requests.get(url, headers=headers, stream=True, timeout=12)
-
-    try:
-        r = _fetch(target_url)
-        # Se il token CDN del manifest è scaduto o ha mismatch (HTTP 401/403), rigeneriamo il CdnToken via Playback API
-        if r.status_code in (401, 403):
-            m_aid = re.search(r'/([0-9a-z]{24,32})/', target_url) or re.search(r'AssetId=([0-9a-z]{24,32})', target_url)
-            asset_id = m_aid.group(1) if m_aid else ""
-            if asset_id:
-                try:
-                    ext = HeadlessExtractor()
-                    pid = _current_pid()
-                    target_profile_dir = get_active_chrome_profile(pid)
-                    res = run_async(ext.estrai(target_profile_dir, asset_id, ""), timeout=30)
-                    if res.get("ok"):
-                        fresh_mpd = res.get("mpd_url", "")
-                        dazn_token = res.get("dazn_token", "")
-                        cdn_name = res.get("cdn_name", "dazn-token")
-                        target_url = _build_mpd_auth(fresh_mpd, dazn_token, cdn_name)
-                        if dazn_token:
-                            headers["dazn-token"] = dazn_token
-                        r = _fetch(target_url)
-                except Exception as ex_ref:
-                    print(f"[Proxy Refresh Error] {ex_ref}")
-
-        content_type = r.headers.get("content-type", "")
-        # Se stiamo gestendo un file di manifest DASH (.mpd), riscriviamo le URL dei segmenti/base_url per forzare il passaggio dal proxy WARP
-        if "xml" in content_type.lower() or target_url.endswith(".mpd") or ".mpd?" in target_url:
-            raw_text = r.text
-            base_proxy_path = request.host_url.rstrip("/") + "/proxy?url="
-            
-            # BaseURL rewriting in MPD manifest
-            def _rewrite_base_url(match):
-                original_url = match.group(1)
-                if original_url.startswith("http"):
-                    encoded = urllib.parse.quote(original_url, safe='')
-                    return f"<BaseURL>{base_proxy_path}{encoded}</BaseURL>"
-                return match.group(0)
-
-            rewritten_text = re.sub(r'<BaseURL>\s*(https?://[^\s<]+)\s*</BaseURL>', _rewrite_base_url, raw_text)
-            
-            excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
-            resp_headers = [(k, v) for k, v in r.headers.items() if k.lower() not in excluded_headers]
-            resp_headers.append(("Content-Type", "application/dash+xml"))
-            return Response(rewritten_text, status=r.status_code, headers=resp_headers)
-
-        excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
-        resp_headers = [(k, v) for k, v in r.headers.items() if k.lower() not in excluded_headers]
-        return Response(r.iter_content(chunk_size=1024*64), status=r.status_code, headers=resp_headers)
-    except Exception as e:
-        return Response(str(e), status=500)
 
 def _auto_extract_worker():
     """Scansiona e estrae automaticamente e istantaneamente tutti gli eventi Live delle competizioni target."""
@@ -1308,7 +1261,8 @@ def _auto_extract_worker():
                             dazn_token = res.get("dazn_token", "")
                             mpd_auth = _build_mpd_auth(mpd_url, dazn_token)
                             keys_str = ",".join(res.get("keys", []))
-                            ua_str = res.get("ua", "")
+                            from dazn_navigator2.services.extractor import detect_user_agent
+                            ua_str = (res.get("ua") or "").strip() or detect_user_agent()
                             logo = cand["image"] or _image_url(res.get("image"))
                             
                             entry = {

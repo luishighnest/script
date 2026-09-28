@@ -233,6 +233,7 @@ def _build_entry(tile: ContentTile, result: dict):
         comp_title = str(comp) or 'Eventi'
     
     from dazn_navigator2.settings import get_setting
+    from dazn_navigator2.services.extractor import detect_user_agent, _valid_browser_ua
     entry = {
         'name': titolo,
         'image': logo,
@@ -241,11 +242,13 @@ def _build_entry(tile: ContentTile, result: dict):
         'mpd': mpd_auth,
         'key': keys_str,
     }
-    # UA nel JSON: controllato separatamente per curl e headless
+    # L'UA e' obbligatorio per la riproduzione (token CDN legato all'UA):
+    # si scrive quello usato davvero, altrimenti quello della sessione.
     engine = get_setting("extraction_engine")
     ua_key = "include_ua_headless" if engine == "headless" else "include_ua_curl"
-    if result.get("ua") and get_setting(ua_key):
-        entry['ua'] = result['ua']
+    entry['ua'] = (result.get("ua") or "").strip() if get_setting(ua_key) else ""
+    if not _valid_browser_ua(entry['ua']):
+        entry['ua'] = detect_user_agent()
 
     from dazn_navigator2.cli.eventi_cmds import add_event
     add_event(comp_title, entry)

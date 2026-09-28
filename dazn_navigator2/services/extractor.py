@@ -1,6 +1,6 @@
 """Estrazione headless: riusa il browser attivo, chiama Playback API, estrae chiavi DRM."""
 
-import sys, json, re, asyncio, subprocess, base64, os, uuid as _uuid, time
+import sys, json, re, asyncio, subprocess, base64, os, uuid as _uuid, time, threading
 
 from pathlib import Path
 
@@ -50,30 +50,229 @@ DEVICE_ID_FILE = Path(__file__).resolve().parent.parent.parent / "saved_profiles
 # Sessione HTTP globale persistente con connection pooling
 _GLOBAL_SESSION = None
 
-def _load_proxy_worker() -> str:
-    """Carica l'URL del Cloudflare Worker senza esporlo nel sorgente.
+# ─── User-Agent: unica fonte di verità per MPD e segmenti ───────────────
+# Il token CDN di DAZN (JWT nel path /@token/ o header dazn-token) contiene
+# il claim "headers":["user-agent"]: la CDN rifiuta (HTTP 401) qualsiasi
+# richiesta il cui User-Agent non coincide con quello usato per ottenere il
+# token dalla Playback API. Per questo l'UA va SEMPRE rilevato dalla sessione
+# HTTP reale e propagato a estrattore, playlist e addon.
+DEFAULT_IMPERSONATE = "chrome142"
 
-    Ordine: variabile d'ambiente DAZN_PROXY_WORKER, poi file locale gitignored
-    (worker_url.txt / .worker_url). Nel repo resta solo un placeholder mascherato.
-    """
-    v = (os.environ.get("DAZN_PROXY_WORKER") or "").strip().rstrip("/")
-    if v:
-        return v
-    for _name in ("worker_url.txt", ".worker_url"):
-        _f = Path(__file__).resolve().parent.parent.parent / _name
+# Rilevamento UA: cache in memoria + cache su disco (config.json)
+_UA_MEMORY_CACHE = {}
+_UA_LOCK = threading.Lock()
+
+UA_PROBE_URLS = (
+    "https://www.cloudflare.com/cdn-cgi/trace",
+    "https://httpbin.org/user-agent",
+    "https://api.ipify.org/?format=json",
+)
+
+# Candidati di fallback (dal piu' probabile): vengono verificati contro la CDN
+_FALLBACK_UA_CHROME = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{v}.0.0.0 Safari/537.36"
+)
+
+# Player Android: usato solo come fallback per la richiesta di licenza
+ANDROID_PLAYER_UA = (
+    "Mozilla/5.0 (Linux; Android 12; SM-A137F Build/SP1A.210812.016; wv) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.135 Mobile Safari/537.36"
+)
+
+
+def _valid_browser_ua(ua: str) -> bool:
+    """True se la stringa e' un User-Agent di browser (non Kodi, non vuoto)."""
+    if not ua or not isinstance(ua, str):
+        return False
+    u = ua.strip()
+    if not u or len(u) < 20:
+        return False
+    low = u.lower()
+    if "kodi" in low or "libcurl" in low or "python-requests" in low:
+        return False
+    return any(t in low for t in ("mozilla/5.0", "chrome/", "safari/", "firefox/", "edg/"))
+
+
+def get_impersonate() -> str:
+    """Profilo TLS curl_cffi da usare (config: preferred_impersonate)."""
+    from dazn_navigator2.settings import get_setting
+    imp = (get_setting("preferred_impersonate") or "").strip()
+    if not imp:
+        return DEFAULT_IMPERSONATE
+    try:
+        from curl_cffi.requests.impersonate import BrowserType
+        allowed = {b.value for b in BrowserType}
+    except Exception:
+        allowed = set()
+    if allowed and imp in allowed:
+        return imp
+    if allowed:
+        return DEFAULT_IMPERSONATE if DEFAULT_IMPERSONATE in allowed else imp
+    return imp
+
+
+def _probe_user_agent_sync(impersonate: str = None) -> str:
+    """Chiede a un echo server l'UA reale inviato dalla sessione curl_cffi."""
+    imp = impersonate or get_impersonate()
+    try:
+        from curl_cffi import requests as creq
+    except Exception:
+        return ""
+    for url in UA_PROBE_URLS:
         try:
-            if _f.exists():
-                _t = _f.read_text(encoding="utf-8").strip().rstrip("/")
-                if _t:
-                    return _t
+            s = creq.Session(impersonate=imp)
+            try:
+                r = s.get(url, timeout=6)
+                txt = r.text or ""
+            finally:
+                try:
+                    s.close()
+                except Exception:
+                    pass
+            ua = ""
+            for line in txt.splitlines():
+                if line.startswith("uag="):
+                    ua = line[4:].strip()
+                    break
+            if not ua and '"user-agent"' in txt:
+                import json as _json
+                try:
+                    ua = _json.loads(txt).get("user-agent", "")
+                except Exception:
+                    ua = ""
+            if _valid_browser_ua(ua):
+                return ua.strip()
         except Exception:
-            pass
+            continue
     return ""
 
-PROXY_WORKER = ""
+
+def detect_user_agent(impersonate: str = None) -> str:
+    """UA reale della sessione: cache -> config.json -> probing -> fallback."""
+    imp = impersonate or get_impersonate()
+    with _UA_LOCK:
+        cached = _UA_MEMORY_CACHE.get(imp)
+        if cached:
+            return cached
+        from dazn_navigator2.settings import get_setting, save_config, load_config
+        stored = (get_setting("curl_user_agent") or "").strip()
+        if stored:
+            # La config puo' essere obsoleta: si valida con un probing leggero
+            # solo se non e' gia' stata verificata in questa sessione.
+            probed = _probe_user_agent_sync(imp)
+            ua = probed or (stored if _valid_browser_ua(stored) else "")
+        else:
+            ua = _probe_user_agent_sync(imp)
+        if not ua:
+            major = "".join(ch for ch in imp if ch.isdigit()) or "131"
+            ua = _FALLBACK_UA_CHROME.format(v=major)
+        _UA_MEMORY_CACHE[imp] = ua
+        try:
+            cfg = load_config()
+            if cfg.get("curl_user_agent") != ua:
+                cfg["curl_user_agent"] = ua
+                cfg.setdefault("preferred_impersonate", imp)
+                save_config(cfg)
+        except Exception:
+            pass
+        return ua
+
+
+def get_user_agent() -> str:
+    """UA da usare per MPD/segmenti (sincrono, usabile anche dall'addon Kodi)."""
+    return detect_user_agent()
+
+
+async def get_session_user_agent(client=None) -> str:
+    """Variante asincrona: riusa la sessione gia' aperta se disponibile."""
+    with _UA_LOCK:
+        cached = _UA_MEMORY_CACHE.get(get_impersonate())
+    if cached:
+        return cached
+    if client is not None:
+        for url in UA_PROBE_URLS:
+            try:
+                r = await client.get(url, timeout=6)
+                txt = r.text or ""
+                ua = ""
+                for line in txt.splitlines():
+                    if line.startswith("uag="):
+                        ua = line[4:].strip()
+                        break
+                if not ua and "user-agent" in txt:
+                    import json as _json
+                    try:
+                        ua = _json.loads(txt).get("user-agent", "")
+                    except Exception:
+                        ua = ""
+                if _valid_browser_ua(ua):
+                    with _UA_LOCK:
+                        _UA_MEMORY_CACHE[get_impersonate()] = ua.strip()
+                    return ua.strip()
+            except Exception:
+                continue
+    return detect_user_agent()
+
+
+def ua_candidates() -> list:
+    """Lista ordinata di User-Agent da provare contro la CDN (auto-riparazione)."""
+    from dazn_navigator2.settings import get_setting
+    out = []
+    for ua in (detect_user_agent(), (get_setting("curl_user_agent") or "").strip()):
+        if _valid_browser_ua(ua) and ua not in out:
+            out.append(ua)
+    for v in ("131", "136", "142", "145", "146", "124", "123"):
+        ua = _FALLBACK_UA_CHROME.format(v=v)
+        if ua not in out:
+            out.append(ua)
+    return out
+
+
+def _cdn_headers(ua: str, dazn_token: str = "") -> dict:
+    h = {
+        "origin": "https://www.dazn.com",
+        "referer": "https://www.dazn.com/",
+        "accept": "*/*",
+    }
+    if ua:
+        h["user-agent"] = ua
+    if dazn_token:
+        h["dazn-token"] = dazn_token
+    return h
+
+
+def validate_cdn_user_agent(mpd_url: str, dazn_token: str = "", candidates=None) -> str:
+    """Verifica quale User-Agent e' realmente accettato dalla CDN per questo MPD.
+
+    Il token e' legato all'UA della richiesta Playback: si testano i candidati e
+    si restituisce il primo che restituisce HTTP 200 (stringa vuota se nessuno).
+    """
+    if not mpd_url:
+        return ""
+    try:
+        from curl_cffi import requests as creq
+        cands = [c for c in (candidates if candidates is not None else ua_candidates()) if c]
+        for ua in cands:
+            try:
+                s = creq.Session(impersonate=get_impersonate())
+                try:
+                    r = s.get(mpd_url, headers=_cdn_headers(ua, dazn_token), timeout=8)
+                finally:
+                    try:
+                        s.close()
+                    except Exception:
+                        pass
+                if r.status_code == 200:
+                    return ua
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return ""
+
 
 _CACHED_SERVICES = {
-    "Playback": f"{PROXY_WORKER}/v5/Playback" if PROXY_WORKER else "https://api.playback.indazn.com/v5/Playback",
+    "Playback": "https://api.playback.indazn.com/v5/Playback",
     "Rails": "https://rails.discovery.indazn.com/eu/v9/rails",
     "Rail": "https://rail.discovery.indazn.com/eu/v1/Rail",
     "Search": "https://search.discovery.indazn.com/v1/search",
@@ -92,7 +291,7 @@ async def _get_http_session():
     sess_loop = getattr(_GLOBAL_SESSION, "_loop", None)
     if _GLOBAL_SESSION is None or (cur_loop is not None and sess_loop is not None and sess_loop != cur_loop):
         from curl_cffi.requests import AsyncSession
-        _GLOBAL_SESSION = AsyncSession(impersonate="chrome142")
+        _GLOBAL_SESSION = AsyncSession(impersonate=get_impersonate())
     return _GLOBAL_SESSION
 
 class HeadlessExtractor:
@@ -575,10 +774,11 @@ class HeadlessExtractor:
         if engine == "headless" and page:
             ua = await page.evaluate("navigator.userAgent")
         else:
-            # Recupera l'esatto User-Agent usato da curl_cffi per garantire che l'hash 'ua' nel dazn-token coincida
+            # L'UA reale inviato dalla sessione curl_cffi: il token CDN e' legato
+            # esattamente a questo valore, un UA "quasi uguale" porta a HTTP 401.
             client = await _get_http_session()
-            ua = getattr(client, "_user_agent", None) or "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-        
+            ua = await get_session_user_agent(client)
+
         dazn_token = cdn_value if cdn_value else (jwt if jwt else "")
 
         # Itera i PlaybackDetails per trovare la CDN funzionante (evita 401 Forbidden-682 su Akamai)
@@ -591,6 +791,7 @@ class HeadlessExtractor:
         chosen_token = ""
         chosen_cdn_name = ""
         chosen_fetch_url = ""
+        chosen_ua = ""
 
         _t = time.time()
         pbd_sorted = sorted(pbd, key=lambda x: 0 if "indazn.com" in x.get("ManifestUrl", "").lower() else 1)
@@ -619,18 +820,21 @@ class HeadlessExtractor:
                     sep = "&" if "?" in c_fetch_url else "?"
                     c_fetch_url = f"{c_fetch_url}{sep}{c_name}={c_val}"
 
-            c_hdrs = {
-                "origin": "https://www.dazn.com",
-                "referer": "https://www.dazn.com/",
-                "dazn-token": c_tok,
-                "accept": "*/*"
-            }
+            c_hdrs = _cdn_headers(ua, c_tok)
+            c_ua_used = ua
 
             try:
                 r_resp = await client.get(c_fetch_url, headers=c_hdrs, timeout=6)
                 if r_resp.status_code == 200:
                     mpd_r = {"ok": True, "status": 200, "body": r_resp.text}
                 elif page:
+                    # Il browser usa il proprio User-Agent: se va a buon fine
+                    # quello diventa l'UA da salvare nell'evento.
+                    page_ua = ""
+                    try:
+                        page_ua = await page.evaluate("navigator.userAgent")
+                    except Exception:
+                        page_ua = ""
                     mpd_r = await page.evaluate(
                         """async ({url, token}) => {
                             try {
@@ -640,28 +844,12 @@ class HeadlessExtractor:
                         }""",
                         {"url": c_fetch_url, "token": c_tok}
                     )
-                elif PROXY_WORKER:
-                    worker_mpd = f"{PROXY_WORKER}/?target={urllib.parse.quote(c_fetch_url)}"
-                    r_worker = await client.get(worker_mpd, headers=c_hdrs, timeout=6)
-                    if r_worker.status_code == 200:
-                        mpd_r = {"ok": True, "status": 200, "body": r_worker.text}
-                    else:
-                        mpd_r = {"ok": False, "status": r_worker.status_code, "body": r_worker.text}
+                    if mpd_r.get("ok"):
+                        c_ua_used = page_ua or ua
                 else:
                     mpd_r = {"ok": False, "status": r_resp.status_code, "body": r_resp.text}
             except Exception as e:
-                if PROXY_WORKER:
-                    try:
-                        worker_mpd = f"{PROXY_WORKER}/?target={urllib.parse.quote(c_fetch_url)}"
-                        r_worker = await client.get(worker_mpd, headers=c_hdrs, timeout=6)
-                        if r_worker.status_code == 200:
-                            mpd_r = {"ok": True, "status": 200, "body": r_worker.text}
-                        else:
-                            mpd_r = {"ok": False, "status": r_worker.status_code, "body": r_worker.text}
-                    except Exception as we:
-                        mpd_r = {"ok": False, "error": str(we)}
-                else:
-                    mpd_r = {"ok": False, "error": str(e)}
+                mpd_r = {"ok": False, "error": str(e)}
 
             if mpd_r.get("ok"):
                 chosen_pbd = cand_pbd
@@ -670,6 +858,7 @@ class HeadlessExtractor:
                 chosen_token = c_tok
                 chosen_cdn_name = c_name
                 chosen_fetch_url = c_fetch_url
+                chosen_ua = c_ua_used
                 break
 
         console.print(f"[dim]  -> 4. Fetch MPD: {time.time() - _t:.2f}s[/dim]")
@@ -686,6 +875,17 @@ class HeadlessExtractor:
         cdn_name = chosen_cdn_name
         fetch_mpd_url = chosen_fetch_url
         self.result["mpd_url"] = mpd_url_original
+
+        # Verifica finale: l'UA salvato deve essere quello accettato dalla CDN per
+        # questo manifest (protegge da token generati con un profilo TLS diverso).
+        ua = chosen_ua or ua
+        verified_ua = validate_cdn_user_agent(fetch_mpd_url, dazn_token, [ua] + ua_candidates())
+        if verified_ua:
+            if verified_ua != ua:
+                console.print(f"[dim]  -> UA verificato dalla CDN: Chrome/{''.join(c for c in verified_ua.split('Chrome/')[-1] if c.isdigit())[:3]}[/dim]")
+            ua = verified_ua
+        else:
+            console.print("[yellow]  -> Attenzione: nessun User-Agent candidato accettato dalla CDN[/yellow]")
 
         _t = time.time()
         import xml.etree.ElementTree as ET
@@ -756,16 +956,20 @@ class HeadlessExtractor:
 
             if page:
                 try:
-                    lic_hdrs["user-agent"] = "Mozilla/5.0 (Linux; Android 12; SM-A137F Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.135 Mobile Safari/537.36"
-                    lic_resp = await page.request.post(
-                        la_url,
-                        headers=lic_hdrs,
-                        data=chal
-                    )
-                    if lic_resp.ok:
-                        lr = {"ok": True, "body": base64.b64encode(await lic_resp.body()).decode("ascii")}
-                        break
-                    else:
+                    # Prima l'UA reale della sessione (coerente con il token
+                    # CDN); l'UA Android del player resta il fallback.
+                    for lic_ua in (ua, ANDROID_PLAYER_UA):
+                        if not lic_ua:
+                            continue
+                        lic_hdrs["user-agent"] = lic_ua
+                        lic_resp = await page.request.post(
+                            la_url,
+                            headers=lic_hdrs,
+                            data=chal
+                        )
+                        if lic_resp.ok:
+                            lr = {"ok": True, "body": base64.b64encode(await lic_resp.body()).decode("ascii")}
+                            break
                         lr = {"ok": False, "status": lic_resp.status, "bodyText": await lic_resp.text()}
                 except Exception as ex:
                     lr = {"ok": False, "error": f"Browser request exception: {ex}"}
@@ -776,45 +980,16 @@ class HeadlessExtractor:
                         lr = {"ok": True, "body": base64.b64encode(lic_resp.content).decode("ascii")}
                         break
                     else:
-                        if PROXY_WORKER:
-                            import urllib.parse
-                            worker_la = f"{PROXY_WORKER}/?target={urllib.parse.quote(la_url)}"
-                            r_w = await client.post(worker_la, headers=lic_hdrs, data=chal, timeout=10)
-                            if r_w.status_code == 200:
-                                lr = {"ok": True, "body": base64.b64encode(r_w.content).decode("ascii")}
-                                break
-                            else:
-                                lr = {
-                                    "ok": False,
-                                    "status": r_w.status_code,
-                                    "bodyText": r_w.text,
-                                    "headers": dict(r_w.headers),
-                                    "browser_res": lr
-                                }
-                        else:
-                            lr = {
-                                "ok": False,
-                                "status": lic_resp.status_code,
-                                "bodyText": lic_resp.text,
-                                "headers": dict(lic_resp.headers),
-                                "browser_res": lr
-                            }
+                        lr = {
+                            "ok": False,
+                            "status": lic_resp.status_code,
+                            "bodyText": lic_resp.text,
+                            "headers": dict(lic_resp.headers),
+                            "browser_res": lr
+                        }
                 except Exception as e:
-                    if PROXY_WORKER:
-                        try:
-                            import urllib.parse
-                            worker_la = f"{PROXY_WORKER}/?target={urllib.parse.quote(la_url)}"
-                            r_w = await client.post(worker_la, headers=lic_hdrs, data=chal, timeout=10)
-                            if r_w.status_code == 200:
-                                lr = {"ok": True, "body": base64.b64encode(r_w.content).decode("ascii")}
-                                break
-                            else:
-                                lr = {"ok": False, "status": r_w.status_code, "bodyText": r_w.text}
-                        except Exception as we:
-                            lr = {"ok": False, "error": str(we)}
-                    else:
-                        if not lr:
-                            lr = {"ok": False, "error": str(e)}
+                    if not lr:
+                        lr = {"ok": False, "error": str(e)}
 
         if not lr or not lr.get("ok"):
             err_msg = f"Licenza: {lr.get('status','?')} - Motivo: {lr.get('statusText', '')} {lr.get('bodyText', '')[:300]} {lr.get('error', '')}".strip()
@@ -855,6 +1030,12 @@ class HeadlessExtractor:
 
         ck = base64.b64encode(json.dumps({kid_hex: key_hex}).encode("utf-8")).decode("utf-8")
 
+        # L'UA non deve MAI essere vuoto: l'addon lo ripropone a Kodi nelle
+        # manifest_headers/stream_headers e senza quello la CDN risponde 401
+        # su manifest e segmenti.
+        if not _valid_browser_ua(ua):
+            ua = detect_user_agent()
+
         hdrs_b64 = base64.b64encode(json.dumps({
             "user-agent": ua,
             "referer": "https://www.dazn.com/",
@@ -871,6 +1052,15 @@ class HeadlessExtractor:
         self.result["jwt"] = jwt
         self.result["cdn_name"] = cdn_name
         self.result["ua"] = ua
+        # Blocco pronto per Kodi: inputstream.adaptive rifiuta license_key per
+        # ClearKey, la proprieta' corretta e' drm_legacy.
+        self.result["drm_legacy"] = "org.w3.clearkey|" + keys[0].replace("|", ",")
+        self.result["headers"] = {
+            "user-agent": ua,
+            "referer": "https://www.dazn.com/",
+            "origin": "https://www.dazn.com",
+            "dazn-token": dazn_token,
+        }
 
         self.result["ok"] = True
 
