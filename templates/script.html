@@ -605,14 +605,17 @@
             border-radius: 7px;
         }
         .extracted-copy {
-            flex: 1 1 0;
             min-width: 0;
-            font-size: .7rem;
+            font-size: .72rem;
             font-weight: 700;
-            letter-spacing: .02em;
-            border-radius: 7px;
-            padding: 5px 6px;
+            letter-spacing: .04em;
+            border-radius: 8px;
+            padding: 7px 14px;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
         .extracted-col { flex: 0 0 100%; max-width: 100%; }
         @media (min-width: 576px) { .extracted-col { flex: 0 0 50%; max-width: 50%; } }
@@ -755,10 +758,21 @@
         }
         .profile-status code { font-size: .72rem; }
         .session-timer {
-            border-radius: 9px;
+            border-radius: 999px !important;
             font-size: .76rem !important;
             line-height: 1;
+            font-weight: 700;
+            letter-spacing: .02em;
+            background: rgba(0, 229, 155, 0.08) !important;
+            border: 1px solid rgba(0, 229, 155, 0.3) !important;
+            color: #ffffff !important;
+            padding: 6px 12px !important;
+            box-shadow: 0 0 16px rgba(0, 229, 155, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px) saturate(160%);
+            -webkit-backdrop-filter: blur(10px) saturate(160%);
         }
+        .session-timer .fa-clock { color: #00e59b; }
+        .session-timer #session-timer-text { letter-spacing: .05em; }
     </style>
 </head>
 <body>
@@ -1218,12 +1232,9 @@ function showZipSetup(reasonText) {
                                     </div>
                                 </div>
                                 <div class="badge-extracted mb-2"><i class="fa-solid fa-check me-1"></i>${comp}</div>
-                                <div class="d-flex gap-1 mt-auto">
-                                    <button class="btn btn-outline-mini extracted-copy" onclick='copyEntry(${eidx}, "mpd", "Manifest MPD copiato!")' title="Copia Manifest MPD">
-                                        <i class="fa-solid fa-file me-1"></i>MPD
-                                    </button>
-                                    <button class="btn btn-outline-mini extracted-copy" onclick='copyEntry(${eidx}, "keys", "Chiavi copiate!")' title="Copia chiavi DRM">
-                                        <i class="fa-solid fa-key me-1"></i>KEY
+                                <div class="mt-auto">
+                                    <button class="btn btn-outline-mini extracted-copy w-100" onclick='copyEntry(${eidx}, "jsonStr", "JSON copiato!")' title="Copia JSON evento">
+                                        <i class="fa-solid fa-code me-1"></i>JSON
                                     </button>
                                 </div>
                             </div>

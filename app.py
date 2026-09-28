@@ -370,8 +370,9 @@ def delete_profile_session():
         "github_msg": git_msg
     })
 
-def refresh_all_dazn_sessions():
-    """Rinnova automaticamente tutti i token JWT DAZN in background prima che scadano."""
+def refresh_all_dazn_sessions(force=False):
+    """Rinnova i token JWT DAZN in background. Se force=False salta i profili
+    il cui token e' ancora valido per piu' di 1 ora (soglia rinnovo automatico)."""
     import requests
     import time
 
@@ -408,6 +409,22 @@ def refresh_all_dazn_sessions():
 
         if not current_jwt or not current_jwt.startswith("eyJ"):
             continue
+
+        # Rinnovo automatico SOLO quando il token e' sceso sotto 1 ora (3600s)
+        try:
+            import base64 as _b64
+            parts = current_jwt.split(".")
+            if len(parts) >= 2:
+                payload_b64 = parts[1]
+                payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+                claims = json.loads(_b64.b64decode(payload_b64).decode("utf-8"))
+                exp_ts = claims.get("exp")
+                if exp_ts:
+                    remaining = int(exp_ts - time.time())
+                    if remaining > 3600 and not force:
+                        continue  # ancora oltre 1 ora: nessun rinnovo automatico necessario
+        except Exception:
+            pass
 
         try:
             # 1) Chiamata API ufficiale RefreshAccessToken DAZN
@@ -463,14 +480,15 @@ def refresh_all_dazn_sessions():
         sync_to_github("auto-refresh: rinnovo automatico token DAZN per i profili")
 
 def _background_dazn_refresher():
-    """Thread in sottofondo che esegue il rinnovo automatico ogni 45 minuti."""
+    """Thread in sottofondo: verifica i token 1 volta ogni ora e rinnova
+    automaticamente SOLO i profili il cui token e' sceso sotto 1 ora."""
     time.sleep(15)
     while True:
         try:
             refresh_all_dazn_sessions()
         except Exception as e:
             print(f"[Auto-Refresh Loop Error] {e}")
-        time.sleep(2700) # Ogni 45 minuti
+        time.sleep(3600)  # 1 volta ogni ora
 
 _refresher_thread = threading.Thread(target=_background_dazn_refresher, daemon=True)
 _refresher_thread.start()
@@ -534,7 +552,7 @@ def api_refresh_dazn_session():
     if "user_profile_id" not in session:
         return jsonify({"ok": False, "error": "Non autenticato"}), 401
     try:
-        refresh_all_dazn_sessions()
+        refresh_all_dazn_sessions(force=True)
         return jsonify({"ok": True, "message": "Rinnovo sessione eseguito con successo!"})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
