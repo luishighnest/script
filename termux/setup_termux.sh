@@ -21,7 +21,6 @@ else
 fi
 
 echo "[4/6] Dipendenze Python (Flask, Playwright, curl_cffi, pywidevine...)..."
-pip install --upgrade pip
 pip install -r "$HOME/script2/requirements.txt"
 
 echo "[5/6] Browser di fallback per l'estrazione (OPZIONALE)..."
