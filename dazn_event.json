@@ -1,13 +1,1 @@
-{
-   "Radio TV Serie A": [
-      {
-         "name": "Focus Serie A",
-         "image": "https://image.discovery.indazn.com/eu/v3/eu/none/d5av2v2amh9f7s207583nf6if_image-header_pIt_1787145012000/fill/none/top/none/100/1280/720/png/image",
-         "start": "2026-09-28T07:00:00Z",
-         "end": "2026-09-28T08:15:00Z",
-         "mpd": "https://dcg-ac-live.cdn.indazn.com/@eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCIsImtpZCI6IjJXZlVweldreUxEcS1aOXkyRG1Yb0VwNXM3SHBYd3FnZGluallsS3c5NWsifQ.eyJ1c2VyIjoiZDk3NzdiOTQtMDE5NS00YmEzLTk3MjEtYjQwOGQ2MjRiODQzIiwiaXNzdWVkIjoxNzkwNTgzMDg2LCJ1c2Vyc3RhdHVzIjoiRnJvemVuIiwic291cmNlVHlwZSI6IiIsInByb2R1Y3RTdGF0dXMiOnsiTkZMIjoiUGFydGlhbCIsIkRBWk4iOiJGcm96ZW4ifSwidmlld2VySWQiOiJiNDA4ZDYyNGI4NDMiLCJjb3VudHJ5IjoiaXQiLCJjb250ZW50Q291bnRyeSI6Iml0IiwibGFuZ3VhZ2UiOiJpdCIsImlzUHVyY2hhc2FibGUiOnRydWUsImhvbWVDb3VudHJ5IjoiaXQiLCJ1c2VyVHlwZSI6MiwiZGV2aWNlSWQiOiJkOTc3N2I5NC0wMTk1LTRiYTMtOTcyMS1iNDA4ZDYyNGI4NDMtMDA0YzM4YTA5MXxkYXpuIiwiaXNEZXZpY2VQbGF5YWJsZSI6dHJ1ZSwicGxheWFibGVFbGlnaWJpbGl0eVN0YXR1cyI6IlBMQVlBQkxFIiwiY2FucmVkZWVtZ2MiOiJFbmFibGVkIiwianRpIjoiMmI4ODcxYzEtNDJlNi00MGQ0LThhYzYtYzI1MWYxZTkzZjk0IiwiaWRwVHlwZSI6ImlkcC1wYXNzd29yZCIsInByb3ZpZGVyTmFtZSI6ImRhem4iLCJwcm92aWRlckN1c3RvbWVySWQiOiI5MTEzZjhhZi1hZGU1LTQ3YTMtOTVlYy1iZGUyYzJiYjg1MjgiLCJlbnRpdGxlbWVudHMiOnsiZW50aXRsZW1lbnRTZXRzIjpbXSwiZmVhdHVyZXMiOnsiQ09OQ1VSUkVOQ1kiOnsibWF4X2RldmljZXMiOjN9LCJERVZJQ0UiOnsibWF4X3JlZ2lzdGVyZWRfZGV2aWNlcyI6OTk5LCJhY2Nlc3NfZGV2aWNlIjoiYW55In19fSwibGlua2VkU29jaWFsUGFydG5lcnMiOlsiZ29vZ2xlIl0sImJpbGxpbmdSb3V0aW5nIjoiYmlsbGluZzJfbmV3IiwiYmlsbGluZ0FjY291bnQiOnRydWUsInV0IjoiRiIsInppcCI6IjgwMTAwIiwiYWNyIjoiZXUtc291dGgtMiIsImVtYWlsIjoiVCIsInBob25lTnVtYmVyIjoiRiIsInByb2ZpbGVJZCI6ImQ5Nzc3Yjk0LTAxOTUtNGJhMy05NzIxLWI0MDhkNjI0Yjg0My11MXAxLWFsZXNzYW5kcm9sb2ZmcmVkbyIsImJyYW5kIjoiZGF6biIsImdlb2FjY3VyYWN5IjoiaGlnaCIsImFkc3BwaWQiOiJkOTc3N2I5NC0wMTk1LTRiYTMtOTcyMS1iNDA4ZDYyNGI4NDMtMDA0YzM4YTA5MS1kYXpuIiwiZXhwIjoxNzkwNTkwMjg2LCJpc3MiOiJodHRwczovL2F1dGguYXIuaW5kYXpuLmNvbSJ9.eD0kkc41MXu4vFjpiemcIifV72ZvV-fYBmJoIL1OYlewh7AMHSIZQ9rrEU1wYLTVahg1DpWboCXvO6OHFaRRjgVaETH1cmIrmioYlg5qqtC5_XDApPxhpEJf1zHXuC97cAEgQaO99hkpclXp81VkEwB4s9H0TMXUE728s7-EyOnEwOV-ZAo2B01muBVCxXwdZOi0ybgm7Ef8sI42tcmCl5LJOB9w9a4rsqfhUK6HCQpRY7CzspPup_U9EZCrQx0ljj2DQx3H874HLWOvrWdyt_sU5VzQ_ul5YY2Mtl4G9rhIOEN2Inyk-kfduR-Z-4MyY7ksZzY2CXLBcZ4kGVV3zw/uj4dg6gdaizk1t7ygb14mlzhh/web/stream.mpd?channel=5064&outlet=dazn-italy&plang=it",
-         "key": "12cedc728a6d5291b9e4c1fbbb0366c4:98e275e3575011d75d198f0b81c5c90b",
-         "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-      }
-   ]
-}
+{}
