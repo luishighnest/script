@@ -37,11 +37,28 @@ _ASYNC_LOOP = None
 _ASYNC_THREAD = None
 _LOOP_LOCK = threading.Lock()
 
-# Cache dei VOD (solo sezione VOD): evita di rifare le ~70 chiamate DAZN a ogni click
-_VOD_CACHE = None
-_VOD_CACHE_TIME = 0
-_VOD_CACHE_TTL = 300
-_VOD_CACHE_LOCK = threading.Lock()
+# Cache dei contenuti (Live/VOD/Lineari/VOD Categorie): il worker in background
+# le riempie periodicamente, così il click su un tab legge la cache e risponde
+# in pochi millisecondi invece di rifare decine di chiamate DAZN.
+_CONTENT_CACHE = {}
+_CONTENT_CACHE_LOCK = threading.Lock()
+_CONTENT_TTL = {
+    "live": 5 * 60,
+    "linear": 15 * 60,
+    "vod": 30 * 60,
+    "vod/categories": 30 * 60,
+}
+
+def _cache_get(section):
+    with _CONTENT_CACHE_LOCK:
+        e = _CONTENT_CACHE.get(section)
+        if e and (time.monotonic() - e["ts"]) < _CONTENT_TTL.get(section, 300):
+            return e["data"]
+    return None
+
+def _cache_put(section, data):
+    with _CONTENT_CACHE_LOCK:
+        _CONTENT_CACHE[section] = {"data": data, "ts": time.monotonic()}
 
 # Ultimo profilo usato dal sito: serve ai thread in background, dove la
 # sessione Flask non e' disponibile.
@@ -624,8 +641,7 @@ def rename_saved_event():
                 break
 
     if renamed:
-        pubblica(f"Rinomina evento {new_name}", data)
-        sync_to_github(f"edit: rinomina evento {new_name} ({_current_pid()})")
+        pubblica(f"Rinomina evento {new_name}", data, asincrono=True)
         return jsonify({"ok": True})
         
     return jsonify({"ok": False, "error": "Evento non trovato"}), 404
@@ -636,8 +652,7 @@ def delete_saved_event():
         return jsonify({"ok": False, "error": "Non autenticato"}), 401
     body = request.get_json() or {}
     if body.get("all"):
-        pubblica("Cancellati tutti gli eventi", {})
-        sync_to_github(f"edit: cancellati tutti gli eventi ({_current_pid()})")
+        pubblica("Cancellati tutti gli eventi", {}, asincrono=True)
         return jsonify({"ok": True})
     
     comp = body.get("comp")
@@ -681,8 +696,7 @@ def delete_saved_event():
                     break
 
     if removed:
-        pubblica("Rimosso evento", data)
-        sync_to_github(f"edit: rimosso evento ({_current_pid()})")
+        pubblica("Rimosso evento", data, asincrono=True)
         return jsonify({"ok": True})
         
     return jsonify({"ok": False, "error": "Evento non trovato"}), 404
@@ -701,8 +715,7 @@ def sort_saved_events():
     nuovo_data = {}
     for _, comp, _, ev_ in ordinato:
         nuovo_data.setdefault(comp, []).append(ev_)
-    pubblica("Eventi riordinati per data", nuovo_data)
-    sync_to_github(f"edit: eventi riordinati per data ({_current_pid()})")
+    pubblica("Eventi riordinati per data", nuovo_data, asincrono=True)
     return jsonify({"ok": True})
 
 @app.route("/api/events/sync_next", methods=["POST"])
@@ -854,89 +867,34 @@ def sync_events_to_next():
     })
 
 
-@app.route("/api/live", methods=["GET"])
-def get_live_events():
-    if "user_profile_id" not in session:
-        return jsonify({"error": "Non autenticato"}), 401
-
-    async def _fetch():
-        explorer = DaznExplorer()
+async def _fetch_live_items():
+    explorer = DaznExplorer()
+    try:
         tiles = await explorer.get_tiles("Live")
-        items = [_format_tile_item(t) for t in tiles]
+        return [_format_tile_item(t) for t in tiles]
+    finally:
         await explorer.close()
-        return items
 
+
+async def _fetch_vod_items():
+    explorer = DaznExplorer()
     try:
-        data = run_async(_fetch(), timeout=45)
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/vod", methods=["GET"])
-def get_vod_events():
-    if "user_profile_id" not in session:
-        return jsonify({"error": "Non autenticato"}), 401
-
-    async def _fetch():
-        explorer = DaznExplorer()
         tiles = await explorer.get_tiles("Catchup")
-        items = [_format_tile_item(t) for t in tiles]
-        await explorer.close()
-        return items
-
-    try:
-        data = run_async(_fetch(), timeout=45)
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/vod/categories", methods=["GET"])
-def get_vod_categories():
-    if "user_profile_id" not in session:
-        return jsonify({"error": "Non autenticato"}), 401
-
-    global _VOD_CACHE, _VOD_CACHE_TIME
-    with _VOD_CACHE_LOCK:
-        if _VOD_CACHE is not None and (time.monotonic() - _VOD_CACHE_TIME) < _VOD_CACHE_TTL:
-            return jsonify(_VOD_CACHE)
-
-    async def _fetch():
-        explorer = DaznExplorer()
-        res = await explorer.get_vod_categories()
+        return [_format_tile_item(t) for t in tiles]
+    finally:
         await explorer.close()
 
-        ultimi = [_format_tile_item(t) for t in res.get("ultimi", [])]
 
-        categorie = {}
-        for t in res.get("all", []):
-            item = _format_tile_item(t)
-            cname = item.get("competition") or "Altro"
-            categorie.setdefault(cname, []).append(item)
-
-        return {"ultimi": ultimi, "categorie": categorie}
-
+async def _fetch_linear_items():
+    explorer = DaznExplorer()
     try:
-        data = run_async(_fetch(), timeout=150)
-        with _VOD_CACHE_LOCK:
-            _VOD_CACHE = data
-            _VOD_CACHE_TIME = time.monotonic()
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/linear", methods=["GET"])
-def get_linear_channels():
-    if "user_profile_id" not in session:
-        return jsonify({"error": "Non autenticato"}), 401
-
-    async def _fetch():
-        explorer = DaznExplorer()
         tiles = await explorer.get_tiles("epg")
         if not tiles:
             tiles = await explorer.get_tiles("LinearChannels")
         items = [_format_tile_item(t) for t in tiles]
-        
-        # Risolvi per ciascun canale il corrispettivo tile 'Live' da search per garantire l'AssetId abilitato
+
+        # Risolvi per ciascun canale il corrispettivo tile 'Live' da search per
+        # garantire l'AssetId abilitato.
         for it in items:
             t_name = it.get("title", "").strip()
             try:
@@ -952,15 +910,128 @@ def get_linear_channels():
                         it["end"] = match[0].raw.get("End")
             except Exception:
                 pass
-
-        await explorer.close()
         return items
+    finally:
+        await explorer.close()
+
+
+async def _fetch_vod_categories():
+    explorer = DaznExplorer()
+    try:
+        res = await explorer.get_vod_categories()
+    finally:
+        await explorer.close()
+    ultimi = [_format_tile_item(t) for t in res.get("ultimi", [])]
+    categorie = {}
+    for t in res.get("all", []):
+        item = _format_tile_item(t)
+        cname = item.get("competition") or "Altro"
+        categorie.setdefault(cname, []).append(item)
+    return {"ultimi": ultimi, "categorie": categorie}
+
+
+def _warm_content_cache_once():
+    """Pre-carica contenuti con cache-first: Live/Lineari/VOD in parallelo."""
+    async def _all():
+        import asyncio as _a
+        live, linear, vod = await _a.gather(
+            _fetch_live_items(), _fetch_linear_items(), _fetch_vod_items(),
+            return_exceptions=True,
+        )
+        out = []
+        for v in (live, linear, vod):
+            out.append(v if not isinstance(v, Exception) else [])
+        return out
 
     try:
-        data = run_async(_fetch(), timeout=45)
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        live, linear, vod = run_async(_all(), timeout=400)
+    except Exception:
+        return
+    _cache_put("live", live)
+    _cache_put("linear", linear)
+    _cache_put("vod", vod)
+    # VOD categorie usa gli stessi dati: si costruisce senza chiamate extra.
+    explorer = DaznExplorer()
+    try:
+        res = run_async((explorer.get_tiles("Catchup")), timeout=120)
+        ultimi = [_format_tile_item(t) for t in res]
+    except Exception:
+        ultimi = []
+    finally:
+        run_async((explorer.close()), timeout=30)
+    categorie = {}
+    for it in vod:
+        cname = it.get("competition") or "Altro"
+        categorie.setdefault(cname, []).append(it)
+    _cache_put("vod/categories", {"ultimi": ultimi, "categorie": categorie})
+
+
+def _warm_content_loop():
+    """Rinfresca la cache dei contenuti in background ogni pochi minuti."""
+    time.sleep(3)
+    while True:
+        try:
+            _warm_content_cache_once()
+        except Exception as e:
+            print(f"[CacheContent] errore: {e}")
+        time.sleep(240)
+
+
+@app.route("/api/live", methods=["GET"])
+def get_live_events():
+    if "user_profile_id" not in session:
+        return jsonify({"error": "Non autenticato"}), 401
+
+    data = _cache_get("live")
+    if data is None:
+        try:
+            data = run_async(_fetch_live_items(), timeout=60)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+        _cache_put("live", data)
+    return jsonify(data)
+
+@app.route("/api/vod", methods=["GET"])
+def get_vod_events():
+    if "user_profile_id" not in session:
+        return jsonify({"error": "Non autenticato"}), 401
+
+    data = _cache_get("vod")
+    if data is None:
+        try:
+            data = run_async(_fetch_vod_items(), timeout=60)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+        _cache_put("vod", data)
+    return jsonify(data)
+
+@app.route("/api/vod/categories", methods=["GET"])
+def get_vod_categories():
+    if "user_profile_id" not in session:
+        return jsonify({"error": "Non autenticato"}), 401
+
+    data = _cache_get("vod/categories")
+    if data is None:
+        try:
+            data = run_async(_fetch_vod_categories(), timeout=150)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+        _cache_put("vod/categories", data)
+    return jsonify(data)
+
+@app.route("/api/linear", methods=["GET"])
+def get_linear_channels():
+    if "user_profile_id" not in session:
+        return jsonify({"error": "Non autenticato"}), 401
+
+    data = _cache_get("linear")
+    if data is None:
+        try:
+            data = run_async(_fetch_linear_items(), timeout=90)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+        _cache_put("linear", data)
+    return jsonify(data)
 
 @app.route("/api/search", methods=["GET"])
 def search_events():
@@ -1377,6 +1448,9 @@ def _warmup_browser_context(pid=None):
 
 if not os.environ.get("SCRIPT2_NO_WARMUP"):
     threading.Thread(target=_warmup_browser_context, daemon=True).start()
+
+if not os.environ.get("SCRIPT2_NO_CONTENTCACHE"):
+    threading.Thread(target=_warm_content_loop, daemon=True).start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

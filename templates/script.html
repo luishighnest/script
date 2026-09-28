@@ -335,6 +335,65 @@
             from { transform: translateX(50px); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
+
+        /* Animazione d'ingresso delle schede: fluida e "filmica" */
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(8px) scale(.985); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .poster-col { animation: cardIn .28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+        /* Scheletro di caricamento (shimmer) al posto dello spinner grezzo */
+        .skeleton-grid .poster-col {
+            animation: none;
+            border-radius: 14px;
+            background: linear-gradient(100deg, #11161d 40%, #1a222c 50%, #11161d 60%);
+            background-size: 220% 100%;
+            aspect-ratio: 16 / 9;
+            animation: shimmer 1.4s ease infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 130% 0; }
+            100% { background-position: -90% 0; }
+        }
+
+        /* Pallino LIVE pulsante */
+        .dot-pulse {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #f85149;
+            display: inline-block;
+            margin-right: 4px;
+            animation: dotPulse 1.3s ease-in-out infinite;
+            box-shadow: 0 0 0 rgba(248,81,73,.5);
+        }
+        @keyframes dotPulse {
+            0% { box-shadow: 0 0 0 0 rgba(248,81,73,.5); }
+            70% { box-shadow: 0 0 0 6px rgba(248,81,73,0); }
+            100% { box-shadow: 0 0 0 0 rgba(248,81,73,0); }
+        }
+
+        /* Scrollbar soft e selezione testi */
+        ::-webkit-scrollbar { width: 9px; height: 9px; }
+        ::-webkit-scrollbar-thumb { background: #1c242e; border-radius: 9px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2a3542; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::selection { background: rgba(248,231,28,.25); }
+
+        /* Contrasto e aria trap poco più puliti */
+        .navbar-brand {
+            font-weight: 800;
+            letter-spacing: .06em;
+            background: linear-gradient(90deg, #f8e71c, #ffb86c);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent !important;
+        }
+
+        /* Transizione soft dei tab-pane */
+        .tab-pane { animation: paneIn .2s ease both; }
+        @keyframes paneIn { from { opacity: .4; } to { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -844,6 +903,8 @@ function showZipSetup(reasonText) {
             const new_name = document.getElementById('rename-title-input').value.trim();
             if (!new_name) return;
 
+            renameModal.hide();
+            const toast = createToast(`Rinomino "${new_name}"...`);
             try {
                 const res = await fetch('/api/events/rename', {
                     method: 'POST',
@@ -852,10 +913,11 @@ function showZipSetup(reasonText) {
                 });
                 const data = await res.json();
                 if (data.ok) {
-                    renameModal.hide();
+                    updateToastSuccess(toast, `Evento rinominato in "${new_name}"`);
                     loadExtracted();
                 } else {
-                    alert("Errore nella rinomina: " + (data.error || "Sconosciuto"));
+                    updateToastError(toast, "Errore nella rinomina: " + (data.error || "Sconosciuto"));
+                    loadExtracted();
                 }
             } catch (err) {
                 alert("Errore nella richiesta: " + err.message);
@@ -920,8 +982,30 @@ function showZipSetup(reasonText) {
         }
 
 
+        const ctCache = { live: null, linear: null, vod: null };
+        const ctFreshMs = 3 * 60 * 1000;
+        function ctGet(key) {
+            const e = ctCache[key];
+            return e && (Date.now() - e.ts) < ctFreshMs ? e.data : null;
+        }
+
+        function preloadSections() {
+            const urls = { live: '/api/live', linear: '/api/linear', vod: '/api/vod/categories' };
+            Object.entries(urls).forEach(([k, u]) => {
+                if (ctGet(k)) return;
+                fetch(u)
+                    .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+                    .then(d => { ctCache[k] = { ts: Date.now(), data: d }; })
+                    .catch(() => {});
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', preloadSections);
+
         async function loadVod() {
             const container = document.getElementById('vod-container');
+            const cached = ctGet('vod');
+            if (cached) { renderVodCategories(cached, container); return; }
             container.innerHTML = `
                 <div class="col-12 text-center py-5">
                     <div class="spinner-border text-info" role="status"></div>
@@ -935,6 +1019,7 @@ function showZipSetup(reasonText) {
                     throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
                 }
                 const data = await res.json();
+                ctCache.vod = { ts: Date.now(), data };
                 renderVodCategories(data, container);
             } catch (err) {
                 container.innerHTML = `<div class="col-12 text-danger text-center py-5">Errore caricamento VOD: ${err.message}</div>`;
@@ -1041,6 +1126,8 @@ function showZipSetup(reasonText) {
 
         async function loadLinear() {
             const container = document.getElementById('linear-container');
+            const cached = ctGet('linear');
+            if (cached) { renderTileGrid(cached, container, 'linear'); return; }
             container.innerHTML = `
                 <div class="col-12 text-center py-5">
                     <div class="spinner-border text-info" role="status"></div>
@@ -1054,6 +1141,7 @@ function showZipSetup(reasonText) {
                     throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
                 }
                 const tiles = await res.json();
+                ctCache.linear = { ts: Date.now(), data: tiles };
                 renderTileGrid(tiles, container, 'linear');
             } catch (err) {
                 container.innerHTML = `<div class="col-12 text-danger text-center py-5">Errore caricamento Canali Lineari: ${err.message}</div>`;
@@ -1105,9 +1193,11 @@ function showZipSetup(reasonText) {
         }
 
         function renderTiles(tiles, grid, contextType) {
-            tiles.forEach(t => {
+            const n = tiles.length;
+            tiles.forEach((t, i) => {
                 const col = document.createElement('div');
                 col.className = 'poster-col';
+                col.style.animationDelay = `${Math.min(i * 22, 500)}ms`;
                 const ttype = (t.tile_type || '').toLowerCase();
                 const isNav = ttype === 'navigation';
                 let badgeColor = 'badge-live';
@@ -1133,12 +1223,12 @@ function showZipSetup(reasonText) {
                     <div class="card-event">
                         <div class="now-card-wrapper" onclick="${isNav ? '' : `extractItem('${t.id}', '${t.asset_id}', '${encodeURIComponent(t.title)}', '${t.image ? encodeURIComponent(t.image) : ''}', '${encodeURIComponent(t.competition || '')}', '${encodeURIComponent(t.start || '')}', '${encodeURIComponent(t.end || '')}')`}" title="${isNav ? '' : 'Estrai Flusso'}">
                             <div class="now-card">
-                                ${t.image ? `<img src="${t.image}" class="card-img-top" alt="${t.title}" onerror="this.style.display='none'">` : ''}
+                                ${t.image ? `<img src="${t.image}" class="card-img-top" alt="${t.title}" loading="lazy" decoding="async" onerror="this.style.display='none'">` : ''}
                                 <div class="now-card-vignette"></div>
                                 ${isNav ? '' : `<div class="now-card-play-icon"><i class="fa fa-play" style="margin-left:3px;"></i></div>`}
                             </div>
                             <div class="now-card-info-external">
-                                <span class="now-card-time-ext">${badgeText}${t.sport ? ' • ' + t.sport : ''}${t.competition ? ' • ' + t.competition : ''}</span>
+                                <span class="now-card-time-ext">${ttype === 'live' ? '<span class="dot-pulse"></span>' : ''}${badgeText}${t.sport ? ' • ' + t.sport : ''}${t.competition ? ' • ' + t.competition : ''}</span>
                                 <span class="now-card-title-ext">${t.title}</span>
                             </div>
                         </div>
@@ -1150,6 +1240,8 @@ function showZipSetup(reasonText) {
 
         async function loadLive() {
             const container = document.getElementById('live-container');
+            const cached = ctGet('live');
+            if (cached) { renderTileGrid(cached, container, 'live'); return; }
             container.innerHTML = `
                 <div class="col-12 text-center py-5">
                     <div class="spinner-border text-info" role="status"></div>
@@ -1163,6 +1255,7 @@ function showZipSetup(reasonText) {
                     throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
                 }
                 const tiles = await res.json();
+                ctCache.live = { ts: Date.now(), data: tiles };
                 renderTileGrid(tiles, container, 'live');
             } catch (err) {
                 container.innerHTML = `<div class="col-12 text-danger text-center">Errore nel recupero Live: ${err.message}</div>`;
