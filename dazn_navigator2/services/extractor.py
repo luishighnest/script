@@ -70,7 +70,7 @@ def _load_proxy_worker() -> str:
             pass
     return ""
 
-PROXY_WORKER = _load_proxy_worker()
+PROXY_WORKER = ""
 
 _CACHED_SERVICES = {
     "Playback": f"{PROXY_WORKER}/v5/Playback" if PROXY_WORKER else "https://api.playback.indazn.com/v5/Playback",
@@ -162,6 +162,9 @@ class HeadlessExtractor:
 
         # 1. Controlla prima i file dedicati dazn_session.json / auth_token.json
         possible_auth_files = [
+            Path(r"C:\Users\alecl\Desktop\chrome_profile\dazn_session.json"),
+            Path(r"C:\Users\alecl\Desktop\chrome_profile\auth_token.json"),
+            Path(r"C:\Users\alecl\Desktop\dazn_session.json"),
             p / "dazn_session.json",
             p / "auth_token.json",
             p / "chrome_profile" / "dazn_session.json",
@@ -186,6 +189,8 @@ class HeadlessExtractor:
 
         # 2. Fallback: LevelDB del browser (solo token country == 'it')
         leveldb_dirs = [
+            Path(r"C:\Users\alecl\Desktop\chrome_profile\Default\Local Storage\leveldb"),
+            Path(r"C:\Users\alecl\Desktop\chrome_profile\Local Storage\leveldb"),
             p / "Default" / "Local Storage" / "leveldb",
             p / "chrome_profile" / "Default" / "Local Storage" / "leveldb",
             p / "Local Storage" / "leveldb",
@@ -448,7 +453,7 @@ class HeadlessExtractor:
     async def estrai(self, profile_dir, asset_id, titolo="") -> dict:
         """Estrae MPD, PSSH, licenza e chiavi in modo istantaneo."""
         global _CACHED_SERVICES, _CACHED_CDM
-        self.result = {"ok": False, "mpd_url": None, "pssh": None, "keys": None, "ext_url": None, "error": None}
+        self.result = {"ok": False, "mpd_url": None, "pssh": None, "keys": None, "ua": None, "error": None}
 
         if not WVD_PATH:
             self.result["error"] = "File .wvd non trovato."
@@ -859,11 +864,6 @@ class HeadlessExtractor:
 
         ext_mpd = chosen_fetch_url if chosen_fetch_url else mpd_url_original
 
-        self.result["ext_url"] = (
-            "extension://opmeopcambhfimffbomjgemehjkbbmji/pages/player.html#"
-            f"{ext_mpd}&ck={urllib.parse.quote(ck)}&headers={urllib.parse.quote(hdrs_b64)}"
-        )
-
         self.result["mpd"] = ext_mpd
         self.result["kodi_url"] = f"{fetch_mpd_url}&ck={ck}&headers={hdrs_b64}"
 
@@ -875,8 +875,6 @@ class HeadlessExtractor:
         self.result["ok"] = True
 
         self.result["titolo"] = titolo
-
-
 
         return self.result
 

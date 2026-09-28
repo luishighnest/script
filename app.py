@@ -83,41 +83,8 @@ def save_profiles_config(data):
     PROFILES_CONFIG_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 def sync_to_github(commit_msg: str):
-    token = os.environ.get("GITHUB_TOKEN", "").strip()
-    if not token:
-        token_file = BASE_DIR / "github_token.txt"
-        if token_file.exists():
-            token = token_file.read_text(encoding="utf-8").strip()
-    if not token:
-        print("[Git Sync] GITHUB_TOKEN non configurato, sync su repo saltato.")
-        return False, "GITHUB_TOKEN non trovato"
-
-    repo_url = f"https://x-access-token:{token}@github.com/luishighnest/script2.git"
-
-    # Flag Windows per sopprimere totalmente la creazione di qualsiasi finestra di console
-    no_win = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-
-    try:
-        subprocess.run(["git", "config", "user.name", "Render Auto-Sync"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["git", "config", "user.email", "render-sync@users.noreply.github.com"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        # Aggiunge i file esistenti
-        targets = ["saved_profiles", "profiles_config.json", "dazn_event.json", "dazn_navigator2"]
-        for t in targets:
-            if (BASE_DIR / t).exists():
-                subprocess.run(["git", "add", t], cwd=str(BASE_DIR), check=False, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        # Commit se ci sono cambiamenti
-        diff = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=str(BASE_DIR), creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if diff.returncode != 0:
-            subprocess.run(["git", "commit", "-m", commit_msg], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(["git", "push", repo_url, "HEAD:main"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("[Git Sync] Salvataggio permanente su GitHub completato con successo!")
-            return True, "Sync completato"
-        return True, "Nessun cambiamento da committare"
-    except Exception as e:
-        print(f"[Git Sync Error] {e}")
-        return False, str(e)
+    # Modalità 100% Locale: nessun push verso GitHub
+    return True, "100% Locale (nessun sync remoto)"
 
 def _image_url(img) -> str:
     if isinstance(img, dict):
@@ -205,6 +172,11 @@ def _resolve_profile_dir(path_str):
     return p_obj
 
 def get_active_chrome_profile(profile_id):
+    # 1. Priorità assoluta: cartella chrome_profile presente direttamente sul Desktop
+    desktop_profile = Path(r"C:\Users\alecl\Desktop\chrome_profile")
+    if desktop_profile.exists():
+        return str(desktop_profile)
+
     cfg = load_profiles_config()
     p = cfg.get(profile_id, {}).get("chrome_profile_path")
     if p:
@@ -1136,6 +1108,83 @@ def generate_m3u():
             lines.append(mpd)
     
     return Response("\n".join(lines), mimetype="audio/x-mpegurl")
+
+@app.route("/proxy", methods=["GET"])
+def proxy_stream():
+    import urllib.parse, requests, re
+    target_url = request.args.get("url")
+    if not target_url:
+        return Response("URL mancante", status=400)
+    
+    # DAZN CDN JWT token validates exact browser User-Agent ("headers":["user-agent"]).
+    # Must use the exact Chrome Browser UA instead of Kodi's UA to avoid HTTP 401.
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Referer": "https://www.dazn.com/",
+        "Origin": "https://www.dazn.com",
+        "Accept": "*/*"
+    }
+    
+    dazn_tok = request.args.get("dazn-token")
+    if dazn_tok:
+        headers["dazn-token"] = dazn_tok
+        
+    def _fetch(url):
+        try:
+            from curl_cffi import requests as c_requests
+            return c_requests.get(url, headers=headers, impersonate="chrome131", stream=True, timeout=15)
+        except Exception:
+            return requests.get(url, headers=headers, stream=True, timeout=12)
+
+    try:
+        r = _fetch(target_url)
+        # Se il token CDN del manifest è scaduto o ha mismatch (HTTP 401/403), rigeneriamo il CdnToken via Playback API
+        if r.status_code in (401, 403):
+            m_aid = re.search(r'/([0-9a-z]{24,32})/', target_url) or re.search(r'AssetId=([0-9a-z]{24,32})', target_url)
+            asset_id = m_aid.group(1) if m_aid else ""
+            if asset_id:
+                try:
+                    ext = HeadlessExtractor()
+                    pid = _current_pid()
+                    target_profile_dir = get_active_chrome_profile(pid)
+                    res = run_async(ext.estrai(target_profile_dir, asset_id, ""), timeout=30)
+                    if res.get("ok"):
+                        fresh_mpd = res.get("mpd_url", "")
+                        dazn_token = res.get("dazn_token", "")
+                        cdn_name = res.get("cdn_name", "dazn-token")
+                        target_url = _build_mpd_auth(fresh_mpd, dazn_token, cdn_name)
+                        if dazn_token:
+                            headers["dazn-token"] = dazn_token
+                        r = _fetch(target_url)
+                except Exception as ex_ref:
+                    print(f"[Proxy Refresh Error] {ex_ref}")
+
+        content_type = r.headers.get("content-type", "")
+        # Se stiamo gestendo un file di manifest DASH (.mpd), riscriviamo le URL dei segmenti/base_url per forzare il passaggio dal proxy WARP
+        if "xml" in content_type.lower() or target_url.endswith(".mpd") or ".mpd?" in target_url:
+            raw_text = r.text
+            base_proxy_path = request.host_url.rstrip("/") + "/proxy?url="
+            
+            # BaseURL rewriting in MPD manifest
+            def _rewrite_base_url(match):
+                original_url = match.group(1)
+                if original_url.startswith("http"):
+                    encoded = urllib.parse.quote(original_url, safe='')
+                    return f"<BaseURL>{base_proxy_path}{encoded}</BaseURL>"
+                return match.group(0)
+
+            rewritten_text = re.sub(r'<BaseURL>\s*(https?://[^\s<]+)\s*</BaseURL>', _rewrite_base_url, raw_text)
+            
+            excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
+            resp_headers = [(k, v) for k, v in r.headers.items() if k.lower() not in excluded_headers]
+            resp_headers.append(("Content-Type", "application/dash+xml"))
+            return Response(rewritten_text, status=r.status_code, headers=resp_headers)
+
+        excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
+        resp_headers = [(k, v) for k, v in r.headers.items() if k.lower() not in excluded_headers]
+        return Response(r.iter_content(chunk_size=1024*64), status=r.status_code, headers=resp_headers)
+    except Exception as e:
+        return Response(str(e), status=500)
 
 def _auto_extract_worker():
     """Scansiona e estrae automaticamente e istantaneamente tutti gli eventi Live delle competizioni target."""

@@ -250,7 +250,7 @@ def _build_entry(tile: ContentTile, result: dict):
     from dazn_navigator2.cli.eventi_cmds import add_event
     add_event(comp_title, entry)
     from dazn_navigator2.services.playlist_ed import token_expiry
-    return comp_title, entry, token_expiry(dazn_token), result.get('ext_url', '')
+    return comp_title, entry, token_expiry(dazn_token)
 
 
 def _print_batch(risultati):
@@ -259,17 +259,13 @@ def _print_batch(risultati):
     from datetime import datetime
     raggruppato = {}
     
-    from dazn_navigator2.settings import get_setting
-    for _, entry, _, ext_url in risultati:
-        if ext_url and get_setting("print_extension_link"):
-            console.print(f"\n[bold cyan]Link Estensione ({entry['name']}):[/bold cyan]\n[green]{ext_url}[/green]")
     console.print("")
     
-    for comp, entry, _, _ in risultati:
+    for comp, entry, _ in risultati:
         raggruppato.setdefault(comp, []).append(entry)
     console.print(_json.dumps(raggruppato, indent=3))
     
-    for comp, entry, scadenza, _ in risultati:
+    for comp, entry, scadenza in risultati:
         if scadenza is not None:
             scad_str = scadenza.strftime('%d/%m/%Y %H:%M')
             stato = '[green]✓[/green]' if scadenza > datetime.now() else '[red]SCADUTO[/red]'
