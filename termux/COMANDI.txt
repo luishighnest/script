@@ -1,0 +1,37 @@
+SCRIPT2 SU TERMUX - GUIDA RAPIDA
+=================================
+
+1) PRIMA INSTALLAZIONE (una volta sola)
+---------------------------------------
+Apri Termux e incolla:
+
+  termux-setup-storage
+  pkg update -y && pkg upgrade -y
+  pkg install -y python pip cloudflared git curl
+  git clone https://github.com/luishighnest/script2.git $HOME/script2
+  bash $HOME/script2/termux/setup_termux.sh
+
+(se vuoi il token per l'aggiornamento automatico del redirect,
+ copia github_token.txt dal telefono:)
+  cp /sdcard/Download/github_token.txt $HOME/script2/github_token.txt
+
+2) AVVIO (ogni volta)
+---------------------
+  bash $HOME/script2/termux/starter.sh
+
+3) TENERE IL TELEFONO SVEGLIO
+-----------------------------
+  pkg install termux-api
+  termux-wake-lock
+e nel client Termux: sfiora il menu -> Keep screen on.
+Imposta la batteria ad "Non ottimizzare" per Termux.
+
+4) NOTE
+-------
+- Il server e' Flask: ogni modifica a app.py/templates richiede
+  di rilanciare starter.sh.
+- L'estrazione usa la via veloce curl_cffi (senza browser) se possibile;
+  per le estrazioni che richiedono il browser: SCRIPT2_NO_WARMUP=0
+  bash $HOME/script2/termux/starter.sh   (dopo aver installato chromium)
+- I token DAZN estratti dal telefono sono legati all'ASN della connessione
+  del telefono (se non usi WARP non saranno ASN 13335).
