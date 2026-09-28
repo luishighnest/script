@@ -896,6 +896,9 @@
                     <button class="btn btn-sm btn-outline-light" onclick="sortEvents()" title="Ordina per data di inizio">
                         <i class="fa-solid fa-arrow-down-short-wide me-1"></i> Ordina per data
                     </button>
+                    <button class="btn btn-sm btn-outline-light" onclick="copyAllJson()" title="Copia tutto il JSON (identico all'API)">
+                        <i class="fa-solid fa-copy me-1"></i> Copia JSON
+                    </button>
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteAllEvents()" title="Elimina tutti gli eventi">
                         <i class="fa-solid fa-trash-can me-1"></i> Elimina Tutti
                     </button>
@@ -906,23 +909,12 @@
 <!-- PANE 1: EVENTI ESTRATTI -->
                 <div class="tab-pane fade show active" id="extracted-pane">
                     <div class="row g-3">
-                        <div class="col-lg-9">
+                        <div class="col-12">
                             <div class="row g-2" id="extracted-container">
                                 <div class="col-12 text-center py-5">
                                     <div class="spinner-border text-warning" role="status"></div>
                                     <p class="mt-2 text-muted">Caricamento eventi estratti...</p>
                                 </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-3">
-                            <div class="d-flex align-items-center justify-content-between section-head">
-                                <h6 class="text-white mb-0"><i class="fa-solid fa-code me-2"></i>JSON Completo</h6>
-                                <button class="btn btn-sm btn-outline-mini py-0 px-2" onclick="copyAllJson()" title="Copia tutto il JSON (identico all'API)">
-                                    <i class="fa-solid fa-copy me-1"></i> Copia JSON
-                                </button>
-                            </div>
-                            <div class="json-viewer">
-                                <pre id="extracted-json">Nessun evento...</pre>
                             </div>
                         </div>
                     </div>
@@ -1197,7 +1189,6 @@ function showZipSetup(reasonText) {
                             <p>Nessun evento salvato. Vai su "Live Disponibili", "VOD" o "Cerca Evento" per estrarre uno stream.</p>
                         </div>
                     `;
-                    document.getElementById('extracted-json').innerText = 'Nessun evento...';
                     window.__eventsJson = '';
                     return;
                 }
@@ -1245,7 +1236,6 @@ function showZipSetup(reasonText) {
 
                 // JSON Completo = identico, byte per byte, alla risposta dell'API /api/events
                 window.__eventsJson = rawJson;
-                document.getElementById('extracted-json').innerText = rawJson;
             } catch (err) {
                 console.error(err);
                 document.getElementById('extracted-container').innerHTML = `<div class="col-12 text-danger text-center">Errore nel caricamento: ${err.message}</div>`;
@@ -1253,7 +1243,7 @@ function showZipSetup(reasonText) {
         }
 
         function copyAllJson() {
-            const fullJson = window.__eventsJson || document.getElementById('extracted-json').innerText;
+            const fullJson = window.__eventsJson || '';
             if (fullJson && fullJson !== 'Nessun evento...') {
                 copyText(fullJson, "JSON completo copiato!");
             }
