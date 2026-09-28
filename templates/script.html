@@ -1845,8 +1845,12 @@ function showCopyToast(msg, isError) {
                         sessionExpTimestamp = data.exp;
                         document.getElementById('session-timer-badge').style.display = 'inline-block';
                     } else {
+                        sessionExpTimestamp = null;
                         document.getElementById('session-timer-badge').style.display = 'none';
                     }
+                    const pathElem = document.getElementById('active-profile-path');
+                    const curPath = pathElem ? pathElem.innerText : '';
+                    updateProfileStatusUI(curPath || "Nessun profilo caricato", Boolean(data.has_token));
                 }
             } catch (e) {
                 console.error("Errore fetch session-status:", e);

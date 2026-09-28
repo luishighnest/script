@@ -179,6 +179,21 @@ def _resolve_profile_dir(path_str):
         p_obj = BASE_DIR / p_obj
     return p_obj
 
+def _profile_dir_has_session(p):
+    """True solo se nel profilo esiste un JWT DAZN valido salvato su disco."""
+    if not p or not Path(p).exists():
+        return False
+    for fname in ("dazn_session.json", "auth_token.json"):
+        try:
+            f = Path(p) / fname
+            if f.exists():
+                j = json.loads(f.read_text(encoding="utf-8")).get("jwt", "")
+                if j and j.startswith("eyJ"):
+                    return True
+        except Exception:
+            continue
+    return False
+
 def get_active_chrome_profile(profile_id):
     # 1. Priorità assoluta: cartella chrome_profile presente direttamente sul Desktop
     desktop_profile = Path(r"C:\Users\alecl\Desktop\chrome_profile")
@@ -234,11 +249,11 @@ def script_page():
     has_folder = False
     if saved_path:
         p_obj = _resolve_profile_dir(saved_path)
-        has_folder = p_obj.exists() and any(p_obj.iterdir()) if p_obj and p_obj.exists() else False
+        has_folder = _profile_dir_has_session(p_obj) if p_obj else False
     
     if not has_folder:
         fallback_dir = UPLOAD_PROFILES_DIR / f"profile_{pid}"
-        if fallback_dir.exists() and any(fallback_dir.iterdir()):
+        if _profile_dir_has_session(fallback_dir):
             has_folder = True
             saved_path = str(fallback_dir.relative_to(BASE_DIR)).replace("\\", "/")
 
