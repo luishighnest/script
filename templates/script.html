@@ -927,7 +927,12 @@ function showZipSetup(reasonText) {
         async function deleteEvent(el) {
             const comp = decodeURIComponent(el.getAttribute('data-comp') || '');
             const index = parseInt(el.getAttribute('data-idx') || '0', 10);
-
+            const card = el.closest('.poster-col');
+            if (card) {
+                card.style.opacity = '0.35';
+                card.style.pointerEvents = 'none';
+            }
+            const toast = createToast('Elimino evento in corso...');
             try {
                 const res = await fetch('/api/events/delete', {
                     method: 'POST',
@@ -936,17 +941,24 @@ function showZipSetup(reasonText) {
                 });
                 const data = await res.json();
                 if (data.ok) {
+                    if (card) card.remove();
+                    updateToastSuccess(toast, 'Evento eliminato', 'Eliminato e salvato con successo!');
                     loadExtracted();
                 } else {
-                    alert("Errore: " + (data.error || "Impossibile eliminare"));
+                    if (card) { card.style.opacity = ''; card.style.pointerEvents = ''; }
+                    updateToastError(toast, 'Eliminazione non riuscita', data.error || 'Errore sconosciuto');
+                    loadExtracted();
                 }
             } catch (err) {
-                alert("Errore di connessione: " + err.message);
+                if (card) { card.style.opacity = ''; card.style.pointerEvents = ''; }
+                updateToastError(toast, 'Errore di rete', err.message);
+                loadExtracted();
             }
         }
 
         async function deleteAllEvents() {
             if (!confirm("ATTENZIONE: Sei sicuro di voler eliminare TUTTI gli eventi salvati?")) return;
+            const toast = createToast('Elimino tutti gli eventi...');
             try {
                 const res = await fetch('/api/events/delete', {
                     method: 'POST',
@@ -955,12 +967,16 @@ function showZipSetup(reasonText) {
                 });
                 const data = await res.json();
                 if (data.ok) {
+                    document.getElementById('extracted-container').innerHTML = '';
+                    updateToastSuccess(toast, 'Tutti gli eventi eliminati', 'Lista svuotata con successo!');
                     loadExtracted();
                 } else {
-                    alert("Errore: " + (data.error || "Impossibile eliminare"));
+                    updateToastError(toast, 'Eliminazione non riuscita', data.error || 'Errore sconosciuto');
+                    loadExtracted();
                 }
             } catch (err) {
-                alert("Errore di connessione: " + err.message);
+                updateToastError(toast, 'Errore di rete', err.message);
+                loadExtracted();
             }
         }
 
@@ -989,13 +1005,38 @@ function showZipSetup(reasonText) {
             return e && (Date.now() - e.ts) < ctFreshMs ? e.data : null;
         }
 
+        function cacheableContents(d) {
+            if (Array.isArray(d)) return d.length > 0;
+            if (d && typeof d === 'object') {
+                if (Array.isArray(d.ultimi)) {
+                    const cat = d.categorie || {};
+                    return d.ultimi.length > 0 || Object.keys(cat).length > 0;
+                }
+                return false;
+            }
+            return false;
+        }
+
+        function showRetry(container, label, retryFn) {
+            container.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <i class="fa-solid fa-tower-broadcast fa-3x text-muted mb-3"></i>
+                    <p class="text-muted mb-3">${label}: DAZN non raggiungibile in questo momento.</p>
+                    <button class="btn btn-dazn btn-sm" id="btn-retry-content"><i class="fa-solid fa-rotate-right me-1"></i>Riprova</button>
+                </div>`;
+            const btn = container.querySelector('#btn-retry-content');
+            if (btn) btn.onclick = retryFn;
+        }
+
         function preloadSections() {
             const urls = { live: '/api/live', linear: '/api/linear', vod: '/api/vod/categories' };
             Object.entries(urls).forEach(([k, u]) => {
                 if (ctGet(k)) return;
                 fetch(u)
                     .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
-                    .then(d => { ctCache[k] = { ts: Date.now(), data: d }; })
+                    .then(d => {
+                        if (cacheableContents(d)) ctCache[k] = { ts: Date.now(), data: d };
+                    })
                     .catch(() => {});
             });
         }
@@ -1014,15 +1055,15 @@ function showZipSetup(reasonText) {
             `;
             try {
                 const res = await fetch('/api/vod/categories');
-                if (!res.ok) {
-                    const txt = await res.text();
-                    throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
-                }
                 const data = await res.json();
+                if (!res.ok || data.error || !cacheableContents(data)) {
+                    showRetry(container, 'Contenuti On-Demand / Replay', () => loadVod());
+                    return;
+                }
                 ctCache.vod = { ts: Date.now(), data };
                 renderVodCategories(data, container);
             } catch (err) {
-                container.innerHTML = `<div class="col-12 text-danger text-center py-5">Errore caricamento VOD: ${err.message}</div>`;
+                showRetry(container, 'Contenuti On-Demand / Replay', () => loadVod());
             }
         }
 
@@ -1136,15 +1177,15 @@ function showZipSetup(reasonText) {
             `;
             try {
                 const res = await fetch('/api/linear');
-                if (!res.ok) {
-                    const txt = await res.text();
-                    throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
-                }
                 const tiles = await res.json();
+                if (!res.ok || tiles.error || !cacheableContents(tiles)) {
+                    showRetry(container, 'Canali lineari', () => loadLinear());
+                    return;
+                }
                 ctCache.linear = { ts: Date.now(), data: tiles };
                 renderTileGrid(tiles, container, 'linear');
             } catch (err) {
-                container.innerHTML = `<div class="col-12 text-danger text-center py-5">Errore caricamento Canali Lineari: ${err.message}</div>`;
+                showRetry(container, 'Canali lineari', () => loadLinear());
             }
         }
 
@@ -1250,15 +1291,15 @@ function showZipSetup(reasonText) {
             `;
             try {
                 const res = await fetch('/api/live');
-                if (!res.ok) {
-                    const txt = await res.text();
-                    throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
-                }
                 const tiles = await res.json();
+                if (!res.ok || tiles.error || !cacheableContents(tiles)) {
+                    showRetry(container, 'Eventi live', () => loadLive());
+                    return;
+                }
                 ctCache.live = { ts: Date.now(), data: tiles };
                 renderTileGrid(tiles, container, 'live');
             } catch (err) {
-                container.innerHTML = `<div class="col-12 text-danger text-center">Errore nel recupero Live: ${err.message}</div>`;
+                showRetry(container, 'Eventi live', () => loadLive());
             }
         }
 
@@ -1279,7 +1320,7 @@ function showZipSetup(reasonText) {
             return toast;
         }
 
-        function updateToastSuccess(toast, title) {
+        function updateToastSuccess(toast, title, desc) {
             toast.className = 'extract-toast success';
             toast.innerHTML = `
                 <div class="toast-icon text-success">
@@ -1287,7 +1328,7 @@ function showZipSetup(reasonText) {
                 </div>
                 <div class="toast-content">
                     <div class="toast-title">${title}</div>
-                    <div class="toast-desc text-success">Estratto e salvato con successo!</div>
+                    <div class="toast-desc text-success">${desc || 'Estratto e salvato con successo!'}</div>
                 </div>
             `;
             setTimeout(() => {
