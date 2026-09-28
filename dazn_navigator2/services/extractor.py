@@ -870,6 +870,7 @@ class HeadlessExtractor:
         self.result["dazn_token"] = dazn_token
         self.result["jwt"] = jwt
         self.result["cdn_name"] = cdn_name
+        self.result["ua"] = ua
 
         self.result["ok"] = True
 
