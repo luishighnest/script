@@ -13,4 +13,6 @@ saved_profiles/*/Default/DawnWebGPUCache/
 saved_profiles/*/Default/chrome_debug.log
 /chrome_profile/
 saved_profiles/**/chrome_profile/
+flask.log
+
 

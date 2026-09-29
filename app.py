@@ -12,6 +12,104 @@ from flask import Flask, render_template, jsonify, request, Response, session, r
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR))
 
+class _FailoverStream:
+    """Stream che non lascia mai propagare un errore di I/O.
+
+    Quando il server gira senza una console reale (avviato in background con
+    Start-Process/nascosto) l'handle console ereditato diventa inutilizzabile:
+    i write riescono finche' il buffer non si riempie, poi flush() solleva
+    OSError [Errno 22] "Invalid argument". Nei print di avanzamento
+    dell'estrattore quell'eccezione veniva propagata come fallimento
+    dell'ESTRAZIONE (HTTP 500) invece di essere un problema di solo logging.
+
+    Alla prima scrittura/flush fallita lo stream originals viene abbandonato
+    e tutti i log successivi vanno su flask.log. La console resta primaria
+    quando funziona, quindi il launcher .bat continua a mostrare l'output.
+    """
+
+    def __init__(self, stream, log_path):
+        self._stream = stream
+        self._log_path = log_path
+        self._log = None
+
+    def _get_log(self):
+        if self._log is None:
+            try:
+                self._log = open(self._log_path, "a", encoding="utf-8", buffering=1)
+            except Exception:
+                self._log = False
+        return self._log or None
+
+    def _break_stream(self):
+        stream, self._stream = self._stream, None
+        try:
+            stream.flush()
+        except Exception:
+            pass
+        try:
+            stream.close()
+        except Exception:
+            pass
+
+    def write(self, data):
+        if self._stream is not None:
+            try:
+                return self._stream.write(data)
+            except Exception:
+                self._break_stream()
+        log = self._get_log()
+        if log is not None:
+            try:
+                log.write(data)
+            except Exception:
+                pass
+        return len(data) if isinstance(data, (str, bytes, bytearray)) else 0
+
+    def flush(self):
+        if self._stream is not None:
+            try:
+                return self._stream.flush()
+            except Exception:
+                self._break_stream()
+        log = self._get_log()
+        if log is not None:
+            try:
+                log.flush()
+            except Exception:
+                pass
+        return None
+
+    def isatty(self):
+        if self._stream is None:
+            return False
+        try:
+            return self._stream.isatty()
+        except Exception:
+            return False
+
+    def fileno(self):
+        if self._stream is None:
+            raise OSError("stream non disponibile")
+        return self._stream.fileno()
+
+    def writable(self):
+        return True
+
+    def readable(self):
+        return False
+
+    def __getattr__(self, name):
+        # Delega attributi rari (encoding, errors, newlines) al stream
+        # originale; dopo il failover usa i default di un file testuale.
+        if self._stream is not None:
+            return getattr(self._stream, name)
+        if name == "encoding":
+            return "utf-8"
+        if name in ("errors", "newlines"):
+            return None
+        raise AttributeError(name)
+
+
 # Protezione per esecuzione nascosta/senza console (es. pythonw o script VBS)
 if sys.stdout is None:
     try:
@@ -25,6 +123,24 @@ if sys.stderr is None:
     except Exception:
         import io
         sys.stderr = io.StringIO()
+
+sys.stdout = _FailoverStream(sys.stdout, BASE_DIR / "flask.log")
+sys.stderr = _FailoverStream(sys.stderr, BASE_DIR / "flask.log")
+
+# ── Neutralizza il renderer "legacy Windows" di rich ─────────────────────
+# Quando il server gira SENZA una console reale (avviato in background con
+# Start-Process/nascosto, handle console ereditato da una shell che poi
+# chiude), rich rileva l'assenza di supporto VT e usa LegacyWindowsTerm per
+# i print di avanzamento dell'estrattore. Il flush su quell'handle morto
+# solleva OSError [Errno 22] e l'errore viene propagato come fallimento
+# dell'ESTRAZIONE (500) invece di essere un innocuo problema di logging.
+# Forzando legacy_windows=False rich scrive sul file/pipe senza toccare le
+# API console: sicuro su Windows (batch e background) e no-op su Linux.
+try:
+    import rich.console as _rich_console
+    _rich_console.detect_legacy_windows = lambda: False
+except Exception:
+    pass
 
 import threading
 from dazn_navigator2.cli.eventi_cmds import _load, _save, _fetch_from_upstash, add_event, pubblica
