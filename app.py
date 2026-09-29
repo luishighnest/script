@@ -218,6 +218,70 @@ def _image_url(img) -> str:
         return ""
     return str(img) if img else ""
 
+
+def _tile_image(tile) -> str:
+    """URL immagine di una tile, provando Image, LogoImage e PromoImage."""
+    raw = getattr(tile, "raw", {}) or {}
+    for key in ("Image", "LogoImage", "PromoImage", "HeroImage", "BackgroundImage", "PortraitImage"):
+        val = raw.get(key)
+        url = _image_url(val)
+        if url:
+            return url
+    return _image_url(getattr(tile, "image", ""))
+
+
+async def _resolve_image_by_asset(asset_id: str, title: str = "") -> str:
+    """Cerca la locandina del canale/evento partendo da asset_id o titolo.
+
+    L'estrattore non restituisce il campo image, quindi quando il frontend non
+    la manda la scheda restava senza locandina. Qui si recupera dai rail.
+    """
+    if not asset_id and not title:
+        return ""
+
+    def _norm(v):
+        return str(v or "").strip().lower().replace("linear:", "")
+
+    want_aid = _norm(asset_id)
+    want_title = str(title or "").strip().lower()
+
+    explorer = None
+    try:
+        explorer = DaznExplorer()
+        for section in ("epg", "LinearChannels", "Live", "LiveAndNextNew"):
+            try:
+                tiles = await explorer.get_tiles(section)
+            except Exception:
+                continue
+            for t in tiles or []:
+                raw = getattr(t, "raw", {}) or {}
+                ids = {t.id, t.asset_id, raw.get("Id"), raw.get("AssetId")}
+                if want_aid and any(_norm(i) == want_aid for i in ids if i):
+                    url = _tile_image(t)
+                    if url:
+                        return url
+        # secondo giro: confronto per titolo esatto
+        if want_title:
+            for section in ("epg", "LinearChannels", "Live", "LiveAndNextNew"):
+                try:
+                    tiles = await explorer.get_tiles(section)
+                except Exception:
+                    continue
+                for t in tiles or []:
+                    if str(getattr(t, "title", "")).strip().lower() == want_title:
+                        url = _tile_image(t)
+                        if url:
+                            return url
+        return ""
+    except Exception:
+        return ""
+    finally:
+        if explorer is not None:
+            try:
+                await explorer.close()
+            except Exception:
+                pass
+
 def _build_mpd_auth(mpd_url: str, dazn_token: str, cdn_name: str = "dazn-token") -> str:
     """Inserisce il token nel formato corretto:
     - /@token/ nel path per i token JWT dei canali lineari (es. indazn.com)
@@ -1323,6 +1387,13 @@ def extract_stream():
             from dazn_navigator2.services.extractor import detect_user_agent
             ua_str = (res.get("ua") or "").strip() or detect_user_agent()
             logo = image or _image_url(res.get("image"))
+            # Se il frontend non ha mandato la locandina, la si recupera dai
+            # rail usando l'asset_id: senza questo la scheda resta senza img.
+            if not logo:
+                try:
+                    logo = await _resolve_image_by_asset(asset_id, title)
+                except Exception:
+                    logo = ""
 
             base_titolo = res.get("titolo") or title
             import re
