@@ -230,48 +230,108 @@ def _tile_image(tile) -> str:
     return _image_url(getattr(tile, "image", ""))
 
 
+_IMAGE_SECTIONS = (
+    "epg", "LinearChannels", "Live", "LiveAndNextNew", "Sport", "Catchup",
+)
+
+
+def _norm_title(v) -> str:
+    """Normalizza un titolo per il confronto: minuscole, senza punteggiatura."""
+    s = str(v or "").lower()
+    for ch in ".,:;'\"()[]|!?":
+        s = s.replace(ch, " ")
+    return " ".join(s.split())
+
+
+def _title_matches(a: str, b: str) -> bool:
+    """Due titoli sono lo stesso evento se uno contiene l'altro come parole."""
+    na, nb = _norm_title(a), _norm_title(b)
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    wa, wb = na.split(), nb.split()
+    if not wa or not wb:
+        return False
+    if len(wb) < len(wa):
+        wa, wb = wb, wa
+    # il titolo piu' corto deve comparire per intero dentro quello piu' lungo
+    return " ".join(wb) in " ".join(wa) or " ".join(wa) in " ".join(wb)
+
+
 async def _resolve_image_by_asset(asset_id: str, title: str = "") -> str:
     """Cerca la locandina del canale/evento partendo da asset_id o titolo.
 
     L'estrattore non restituisce il campo image, quindi quando il frontend non
-    la manda la scheda restava senza locandina. Qui si recupera dai rail.
+    la manda la scheda restava senza locandina. Qui si recupera cercando la
+    tile corrispondente: prima per asset_id esatto, poi per titolo.
+    Per gli eventi sportivi il titolo nei rail differisce spesso da quello
+    salvato ('Eupago Porto Open | Giorno 2' vs 'Porto Open Day 2'), quindi il
+    confronto e' tolerantepar le parole, non letterale.
     """
     if not asset_id and not title:
         return ""
 
-    def _norm(v):
+    def _norm_id(v):
         return str(v or "").strip().lower().replace("linear:", "")
 
-    want_aid = _norm(asset_id)
-    want_title = str(title or "").strip().lower()
+    want_aid = _norm_id(asset_id)
+    want_title = str(title or "").strip()
 
     explorer = None
     try:
         explorer = DaznExplorer()
-        for section in ("epg", "LinearChannels", "Live", "LiveAndNextNew"):
-            try:
-                tiles = await explorer.get_tiles(section)
-            except Exception:
-                continue
-            for t in tiles or []:
-                raw = getattr(t, "raw", {}) or {}
-                ids = {t.id, t.asset_id, raw.get("Id"), raw.get("AssetId")}
-                if want_aid and any(_norm(i) == want_aid for i in ids if i):
-                    url = _tile_image(t)
-                    if url:
-                        return url
-        # secondo giro: confronto per titolo esatto
-        if want_title:
-            for section in ("epg", "LinearChannels", "Live", "LiveAndNextNew"):
+
+        # 1) asset_id esatto: e' il caso piu' comune e non richiede confronti
+        if want_aid:
+            for section in _IMAGE_SECTIONS:
                 try:
                     tiles = await explorer.get_tiles(section)
                 except Exception:
                     continue
                 for t in tiles or []:
-                    if str(getattr(t, "title", "")).strip().lower() == want_title:
+                    raw = getattr(t, "raw", {}) or {}
+                    ids = {t.id, t.asset_id, raw.get("Id"), raw.get("AssetId")}
+                    if any(_norm_id(i) == want_aid for i in ids if i):
                         url = _tile_image(t)
                         if url:
                             return url
+
+        # 2) titolo: confronto esatto sui rail
+        if want_title:
+            for section in _IMAGE_SECTIONS:
+                try:
+                    tiles = await explorer.get_tiles(section)
+                except Exception:
+                    continue
+                for t in tiles or []:
+                    if str(getattr(t, "title", "")).strip().lower() == want_title.lower():
+                        url = _tile_image(t)
+                        if url:
+                            return url
+
+        # 3) evento sportivo: il titolo non coincide mai alla lettera, quindi
+        #    si usa la ricerca testuale e si sceglie il risultato piu' vicino.
+        if want_title:
+            try:
+                res = await explorer.search(want_title)
+            except Exception:
+                res = []
+            best, best_score = "", -1.0
+            for t in res or []:
+                t_title = str(getattr(t, "title", ""))
+                if not _title_matches(t_title, want_title):
+                    continue
+                url = _tile_image(t)
+                if not url:
+                    continue
+                na, nb = _norm_title(t_title), _norm_title(want_title)
+                wa, wb = set(na.split()), set(nb.split())
+                score = len(wa & wb) / max(len(wa | wb), 1)
+                if score > best_score:
+                    best, best_score = url, score
+            if best:
+                return best
         return ""
     except Exception:
         return ""
