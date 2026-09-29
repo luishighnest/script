@@ -1143,36 +1143,105 @@ function showZipSetup(reasonText) {
 
         const renameModal = new bootstrap.Modal(document.getElementById('renameModal'));
 
+        // ── Scadenza flusso (exp dal token MPD) ────────────────────────────
+        // Problemi risolti rispetto alla versione precedente:
+        //  - atob senza padding base64 falliva su payload non multipli di 4
+        //    -> la card veniva nascosta con d-none ("scompareva");
+        //  - la decode veniva rifatta a ogni re-render, quindi un solo
+        //    fallimento cancellava la scadenza in modo permanente;
+        //  - querySelectorAll su tutte le card ogni secondo + setInterval
+        //    throttled dal browser in tab di background -> il conto si
+        //    bloccava e al ritorno saltava;
+        //  - un'eccezione su una singola card uccideva l'intero loop.
+        // Ora: registro degli elementi, tick protetto, riallineamento al
+        // rientro in tab e cache anche dei fallimenti.
+        const _expiryRegistry = new Map();   // Element -> exp in ms
+        const _expCache = new Map();         // mpd -> exp in ms | null
+
+        function _b64urlToJson(seg) {
+            let b64 = String(seg).replace(/-/g, '+').replace(/_/g, '/');
+            // atob pretende una lunghezza multipla di 4
+            while (b64.length % 4) b64 += '=';
+            const bin = atob(b64);
+            return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+        }
+
         function decodeMpdExp(mpd) {
+            if (!mpd) return null;
+            if (_expCache.has(mpd)) return _expCache.get(mpd);
+            let result = null;
             try {
-                const m = (mpd || '').match(/@(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/);
-                if (!m) return null;
-                const payloadB64 = m[1].split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-                const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payloadB64), c => c.charCodeAt(0))));
-                return claims.exp ? claims.exp * 1000 : null;
+                // Tollera 2 o 3 segmenti e payload non vuoto
+                const m = String(mpd).match(/@(eyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+)/);
+                if (m) {
+                    const claims = _b64urlToJson(m[1].split('.')[1] || '');
+                    if (claims && claims.exp) result = claims.exp * 1000;
+                }
             } catch (e) {
-                return null;
+                result = null;
             }
+            // Si cachiano anche i fallimenti: niente retry a ogni render
+            _expCache.set(mpd, result);
+            return result;
+        }
+
+        function _fmtRemain(ms) {
+            const total = Math.max(0, Math.floor(ms / 1000));
+            const h = Math.floor(total / 3600);
+            const m = Math.floor((total % 3600) / 60);
+            const s = total % 60;
+            if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+            if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
+            return `${s}s`;
+        }
+
+        function resetStreamExpiryRegistry() {
+            _expiryRegistry.clear();
+        }
+
+        function registerStreamExpiry(el, expMs) {
+            if (!el) return;
+            if (expMs) _expiryRegistry.set(el, expMs);
+            else _expiryRegistry.delete(el);
         }
 
         function tickStreamExpiry() {
             const now = Date.now();
-            document.querySelectorAll('.stream-exp[data-exp]').forEach((el) => {
-                const exp = parseInt(el.getAttribute('data-exp'), 10);
-                if (isNaN(exp)) return;
-                const span = el.querySelector('.stream-exp-countdown');
-                if (!span) return;
-                const remain = exp - now;
-                if (remain <= 0) {
-                    span.textContent = 'SCADUTO';
-                    el.classList.add('text-danger');
-                } else {
-                    const h = Math.floor(remain / 3600000);
-                    const m = Math.floor((remain % 3600000) / 60000);
-                    const s = Math.floor((remain % 60000) / 1000);
-                    span.textContent = h + 'h ' + String(m).padStart(2, '0') + 'm ' + String(s).padStart(2, '0') + 's';
+            _expiryRegistry.forEach((exp, el) => {
+                try {
+                    const span = el.querySelector('.stream-exp-countdown');
+                    if (!span) { _expiryRegistry.delete(el); return; }
+                    const remain = exp - now;
+                    if (remain <= 0) {
+                        if (span.textContent !== 'SCADUTO') {
+                            span.textContent = 'SCADUTO';
+                            el.classList.remove('text-success', 'text-muted');
+                            el.classList.add('text-danger');
+                        }
+                    } else {
+                        const txt = _fmtRemain(remain);
+                        // Solo se cambia: evita reflow inutili ogni secondo
+                        if (span.textContent !== txt) {
+                            span.textContent = txt;
+                            el.classList.remove('text-danger');
+                            el.classList.add('text-success');
+                        }
+                    }
+                } catch (e) {
+                    // Una card rotta non deve bloccare il resto
+                    _expiryRegistry.delete(el);
                 }
             });
+        }
+
+        function startStreamExpiryTicker() {
+            if (window.__expiryTicker) return;
+            window.__expiryTicker = setInterval(tickStreamExpiry, 1000);
+            document.addEventListener('visibilitychange', () => {
+                // I timer sono throttled in background: al rientro riallinea
+                if (!document.hidden) tickStreamExpiry();
+            });
+            window.addEventListener('focus', tickStreamExpiry);
         }
 
         async function loadExtracted() {
@@ -1183,6 +1252,7 @@ function showZipSetup(reasonText) {
                 const data = JSON.parse(rawJson);
                 const container = document.getElementById('extracted-container');
                 container.innerHTML = '';
+                resetStreamExpiryRegistry();
                 
                 const entries = [];
                 const cleanData = {};
@@ -1256,8 +1326,8 @@ function showZipSetup(reasonText) {
                                     </div>
                                 </div>
                                 <div class="badge-extracted mb-2"><i class="fa-solid fa-check me-1"></i>${comp}</div>
-                                <div class="stream-exp small text-muted mt-1 mb-2${expMs ? '' : ' d-none'}" data-exp="${expMs || ''}">
-                                    <i class="fa-solid fa-hourglass-half me-1"></i>Flusso scade tra <span class="stream-exp-countdown fw-semibold">--</span>
+                                <div class="stream-exp small mt-1 mb-2 ${expMs ? 'text-success' : 'text-muted'}" data-exp="${expMs || ''}">
+                                    <i class="fa-solid fa-hourglass-half me-1"></i>Flusso scade tra <span class="stream-exp-countdown fw-semibold">${expMs ? '…' : 'n/d'}</span>
                                 </div>
                                 <div class="mt-auto">
                                     <button class="btn btn-outline-mini extracted-copy w-100" onclick='copyEntry(${eidx}, "jsonStr", "JSON copiato!")' title="Copia JSON evento">
@@ -1268,6 +1338,7 @@ function showZipSetup(reasonText) {
                         </div>
                     `;
                     container.appendChild(col);
+                    registerStreamExpiry(col.querySelector('.stream-exp'), expMs);
                 });
 
                 // JSON Completo = identico, byte per byte, alla risposta dell'API /api/events
@@ -1946,7 +2017,8 @@ function showCopyToast(msg, isError) {
         updateSessionTimer();
         setInterval(tickSessionTimer, 1000);
         setInterval(updateSessionTimer, 30000);
-        setInterval(tickStreamExpiry, 1000);
+        tickStreamExpiry();
+        startStreamExpiryTicker();
     </script>
 </body>
 </html>
