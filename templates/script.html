@@ -893,6 +893,9 @@
                 <!-- Pulsanti Azione Rapida Eventi Estratti -->
                 <div id="events-actions-bar" class="d-flex gap-2">
 
+                    <button class="btn btn-sm btn-warning" onclick="openEventPool()" title="Unisce gli eventi delle due fonti (menu Pz8, tasti 3 e 4) e permette di scegliere quale canale MPD inserire">
+                        <i class="fa-solid fa-layer-group me-1"></i> Aggiungi eventi
+                    </button>
                     <button class="btn btn-sm btn-outline-light" onclick="sortEvents()" title="Ordina per data di inizio">
                         <i class="fa-solid fa-arrow-down-short-wide me-1"></i> Ordina per data
                     </button>
@@ -1009,6 +1012,32 @@
                         <button type="submit" class="btn btn-sm btn-dazn">Salva Modifica</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Aggiungi Eventi: pool unito delle due fonti, si sceglie il canale -->
+    <div class="modal fade" id="poolModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content" style="background-color: var(--card); border: 1px solid var(--border); color: var(--text);">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="fa-solid fa-layer-group me-2 text-warning"></i>Aggiungi eventi</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <input type="text" id="pool-search" class="form-control bg-dark text-white border-secondary form-control-sm"
+                               placeholder="Cerca evento o canale..." oninput="renderPool()">
+                        <button class="btn btn-sm btn-outline-light" onclick="loadEventPool()" title="Ricarica dalle fonti">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                    <div id="pool-info" class="text-secondary small mb-2"></div>
+                    <div id="pool-list"><div class="text-center py-4 text-muted">Premi il pulsante per caricare gli eventi.</div></div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Chiudi</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1783,6 +1812,100 @@ function showZipSetup(reasonText) {
                 renderTileGrid(tiles, container, 'live');
             } catch (err) {
                 showRetry(container, 'Eventi live', () => loadLive());
+            }
+        }
+
+        // ---- Pool eventi (fonti Pz8 tasti 3 e 4, solo canali MPD) ----
+        let __pool = [];
+
+        function openEventPool() {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('poolModal')).show();
+            loadEventPool();
+        }
+
+        async function loadEventPool() {
+            const list = document.getElementById('pool-list');
+            const info = document.getElementById('pool-info');
+            list.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-warning" role="status"></div></div>';
+            info.textContent = 'Lettura fonti su Upstash...';
+            try {
+                const res = await fetch('/api/events/pool');
+                const data = await res.json();
+                if (!data.ok) {
+                    list.innerHTML = `<div class="text-center py-4 text-danger">${data.error || 'Errore'}</div>`;
+                    info.textContent = '';
+                    return;
+                }
+                __pool = data.events || [];
+                const s = data.stats || {};
+                info.innerHTML = `${__pool.length} eventi con canali MPD &middot; ` +
+                    `${s.canali || 0} canali DASH &middot; ` +
+                    `${s.scartati_non_mpd || 0} scartati (m3u8/HLS/embed)`;
+                renderPool();
+            } catch (e) {
+                list.innerHTML = `<div class="text-center py-4 text-danger">Errore di rete: ${e.message}</div>`;
+                info.textContent = '';
+            }
+        }
+
+        function renderPool() {
+            const list = document.getElementById('pool-list');
+            const q = (document.getElementById('pool-search').value || '').trim().toLowerCase();
+            let rows = __pool;
+            if (q) {
+                rows = __pool.filter(ev =>
+                    (ev.title || '').toLowerCase().includes(q) ||
+                    (ev.category || '').toLowerCase().includes(q) ||
+                    (ev.channels || []).some(c => (c.name || '').toLowerCase().includes(q)));
+            }
+            if (rows.length === 0) {
+                list.innerHTML = '<div class="text-center py-4 text-muted">Nessun evento MPD corrisponde alla ricerca.</div>';
+                return;
+            }
+            list.innerHTML = rows.map(ev => {
+                const opts = (ev.channels || []).map((c, i) =>
+                    `<option value="${i}">${c.name}</option>`).join('');
+                const src = (ev.sources || []).join(' + ');
+                const multi = (ev.channels || []).length > 1
+                    ? `<span class="badge text-bg-secondary ms-1">${ev.channels.length} canali MPD</span>`
+                    : '';
+                return `
+                <div class="border-bottom border-secondary pb-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">${ev.title}${multi}</div>
+                            <div class="text-secondary small">
+                                ${ev.category || ''}${ev.start ? ' &middot; ' + ev.start : ''} &middot; <span class="text-muted">${src}</span>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-shrink-0">
+                            <select class="form-select form-select-sm bg-dark text-white border-secondary" id="chsel-${ev.id}" style="max-width:190px">${opts}</select>
+                            <button class="btn btn-sm btn-dazn" onclick="addPoolChannel('${ev.id}')">Aggiungi</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function addPoolChannel(eventId) {
+            const sel = document.getElementById('chsel-' + eventId);
+            if (!sel || sel.selectedIndex < 0) return;
+            const toast = createToast('Salvataggio evento', 'Aggiunta in Eventi Estratti in corso...');
+            try {
+                const res = await fetch('/api/events/add-from-pool', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: eventId, channel_index: sel.selectedIndex })
+                });
+                const data = await res.json();
+                if (!data.ok) {
+                    updateToastError(toast, 'Salvataggio fallito', data.error || 'Errore');
+                    return;
+                }
+                updateToastSuccess(toast, 'Evento aggiunto', `${data.event} &middot; ${data.channel}`);
+                if (typeof loadExtracted === 'function') loadExtracted();
+            } catch (e) {
+                updateToastError(toast, 'Salvataggio fallito', e.message);
             }
         }
 

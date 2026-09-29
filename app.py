@@ -731,9 +731,19 @@ def delete_profile_session():
         "github_msg": git_msg
     })
 
+# Soglia e frequenza del rinnovo automatico del token JWT DAZN.
+# I token durano circa 2 ore. Con una frequenza di controllo pari a FREQ e una
+# soglia SOGLIA, nel caso peggiore il rinnovo parte quando restano SOGLIA - FREQ
+# secondi: con questi numeri il margine e' di 30 minuti, quindi il token non
+# arriva mai a scadere. Prima controllo 1 ora + soglia 1 ora: margine ZERO, e
+# il token poteva finire scaduto e finire sul fallback dai cookie.
+SOGLIA_RINNOVO_S = 45 * 60
+FREQ_CONTROLLO_S = 15 * 60
+
+
 def refresh_all_dazn_sessions(force=False):
     """Rinnova i token JWT DAZN in background. Se force=False salta i profili
-    il cui token e' ancora valido per piu' di 1 ora (soglia rinnovo automatico)."""
+    il cui token e' ancora valido per piu' di SOGLIA_RINNOVO_S secondi."""
     import requests
     import time
 
@@ -771,7 +781,8 @@ def refresh_all_dazn_sessions(force=False):
         if not current_jwt or not current_jwt.startswith("eyJ"):
             continue
 
-        # Rinnovo automatico SOLO quando il token e' sceso sotto 1 ora (3600s)
+        # Rinnovo automatico SOLO quando il token e' sceso sotto la soglia
+        remaining = None
         try:
             import base64 as _b64
             parts = current_jwt.split(".")
@@ -782,10 +793,16 @@ def refresh_all_dazn_sessions(force=False):
                 exp_ts = claims.get("exp")
                 if exp_ts:
                     remaining = int(exp_ts - time.time())
-                    if remaining > 3600 and not force:
-                        continue  # ancora oltre 1 ora: nessun rinnovo automatico necessario
+                    if remaining > SOGLIA_RINNOVO_S and not force:
+                        continue  # ancora oltre la soglia: nessun rinnovo necessario
+                    print(f"[Auto-Refresh DAZN] Profilo {pid}: token sotto soglia, rinnovo "
+                          f"({remaining // 60} min rimasti, soglia {SOGLIA_RINNOVO_S // 60} min)")
         except Exception:
-            pass
+            # Se non riesco a leggere la scadenza non posso fidarmi del token:
+            # in caso di dubbio rinnovo, con force=False pero' lascio perdere
+            # un ciclo di 15 minuti invece di chiamare l'API alla cieca.
+            if not force and remaining is not None:
+                continue
 
         try:
             # 1) Chiamata API ufficiale RefreshAccessToken DAZN
@@ -841,15 +858,19 @@ def refresh_all_dazn_sessions(force=False):
         sync_to_github("auto-refresh: rinnovo automatico token DAZN per i profili")
 
 def _background_dazn_refresher():
-    """Thread in sottofondo: verifica i token 1 volta ogni ora e rinnova
-    automaticamente SOLO i profili il cui token e' sceso sotto 1 ora."""
+    """Thread in sottofondo: verifica i token ogni FREQ_CONTROLLO_S e rinnova
+    automaticamente SOLO i profili il cui token e' sceso sotto SOGLIA_RINNOVO_S.
+    Con i valori correnti il margine minimo prima della scadenza e' di 30
+    minuti, quindi il token non dovrebbe mai arrivare a scadere da solo."""
+    print(f"[Auto-Refresh DAZN] Controllo ogni {FREQ_CONTROLLO_S // 60} min, "
+          f"rinnovo sotto i {SOGLIA_RINNOVO_S // 60} min")
     time.sleep(15)
     while True:
         try:
             refresh_all_dazn_sessions()
         except Exception as e:
             print(f"[Auto-Refresh Loop Error] {e}")
-        time.sleep(3600)  # 1 volta ogni ora
+        time.sleep(FREQ_CONTROLLO_S)
 
 _refresher_thread = threading.Thread(target=_background_dazn_refresher, daemon=True)
 _refresher_thread.start()
@@ -1079,6 +1100,75 @@ def sort_saved_events():
         nuovo_data.setdefault(comp, []).append(ev_)
     pubblica("Eventi riordinati per data", nuovo_data, asincrono=True)
     return jsonify({"ok": True})
+
+@app.route("/api/events/pool", methods=["GET"])
+def event_pool():
+    """Eventi uniti delle due fonti del menu Pz8 (tasti 3 e 4), solo canali MPD.
+
+    Ogni voce e' UN evento con dentro tutti i suoi canali DASH: i due tasti
+    inviano gli stessi eventi in due formati diversi, quindi vengono normalizzati
+    e deduplicati per id. m3u8/HLS e link senza manifest DASH sono esclusi.
+    """
+    if "user_profile_id" not in session:
+        return jsonify({"ok": False, "error": "Non autenticato"}), 401
+    try:
+        from dazn_navigator2.cli.eventi_cmds import build_event_pool
+        pool, stats = build_event_pool()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Errore nel pool eventi: {e}"}), 500
+    return jsonify({"ok": True, "events": pool, "stats": stats})
+
+@app.route("/api/events/add-from-pool", methods=["POST"])
+def add_event_from_pool():
+    """Inserisce in Eventi Estratti UN canale specifico di un evento del pool.
+
+    Il canale arriva dal client, quindi viene riverificato contro il pool letto
+    dal server: non si puo' cosi' infilare un m3u8 o un URL arbitrario. 'mpd' viene
+    ricalcolato dal canale scelto e non preso dalla richiesta.
+    """
+    if "user_profile_id" not in session:
+        return jsonify({"ok": False, "error": "Non autenticato"}), 401
+    body = request.get_json() or {}
+    event_id = body.get("id")
+    channel_index = body.get("channel_index")
+    if event_id is None or channel_index is None:
+        return jsonify({"ok": False, "error": "Parametri non validi"}), 400
+
+    try:
+        from dazn_navigator2.cli.eventi_cmds import build_event_pool, pool_entry
+        pool, _ = build_event_pool()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Errore nel pool eventi: {e}"}), 500
+
+    target = None
+    for ev in pool:
+        if str(ev.get("id")) == str(event_id):
+            target = ev
+            break
+    if not target:
+        return jsonify({"ok": False, "error": "Evento non trovato nel pool"}), 404
+
+    try:
+        idx = int(channel_index)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Canale non valido"}), 400
+    if not (0 <= idx < len(target["channels"])):
+        return jsonify({"ok": False, "error": "Canale non valido"}), 400
+
+    channel = target["channels"][idx]
+    entry = pool_entry(target, channel)
+    if not entry:
+        return jsonify({"ok": False, "error": "Il canale selezionato non e' in formato MPD"}), 400
+
+    from dazn_navigator2.cli.eventi_cmds import add_event
+    competition = target.get("category") or "Eventi"
+    add_event(competition, entry, _current_pid(), asincrono=True)
+    return jsonify({
+        "ok": True,
+        "event": entry["name"],
+        "channel": channel["name"],
+        "competition": competition,
+    })
 
 @app.route("/api/events/sync_next", methods=["POST"])
 def sync_events_to_next():

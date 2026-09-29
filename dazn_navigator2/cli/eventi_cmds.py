@@ -140,6 +140,178 @@ def _iter_entries(data):
             n += 1
 
 
+# ---------------------------------------------------------------------------
+# Pool eventi: unisce le due fonti che il menu Pz8 (tasti 3 e 4) invia su
+# Upstash. Le due fonti descrivono gli STESSI eventi in due formati diversi,
+# quindi non sono da fondere per origine ma da normalizzare e deduplicare.
+# ---------------------------------------------------------------------------
+
+def is_mpd(url):
+    """True solo se l'URL e' un manifest MPEG-DASH (.mpd).
+
+    Esclude m3u8/HLS, link senza estensione e URL vuoti: il sito li mostrava
+    insieme ai DASH e i canali non MPD non si aprono in Kodi.
+    """
+    if not url:
+        return False
+    u = str(url).split("?", 1)[0].split("#", 1)[0].strip().lower()
+    return u.endswith(".mpd")
+
+
+def _split_sportzx_link(link):
+    """'https://x.cenc.mpd|user-agent=Mozilla/5.0 ...' -> (mpd_url, user_agent)."""
+    if not link:
+        return "", ""
+    text = str(link)
+    if "|" in text:
+        url, _, tail = text.partition("|")
+        ua = tail.strip()
+        if ua.lower().startswith("user-agent="):
+            ua = ua[len("user-agent="):]
+        return url.strip(), ua.strip()
+    return text.strip(), ""
+
+
+def _upstash_get(key):
+    """Legge una chiave da Upstash. Ritorna None se irraggiungibile o assente."""
+    try:
+        import requests
+        url = f"https://ace-seal-162556.upstash.io/get/stream:{key}"
+        headers = {"Authorization": "Bearer gQAAAAAAAnr8AAIgcDEyZjRkYjEwYmUzZDY0M2RhYjZkNjhmMDFjNGVkMjVmYw"}
+        res = requests.get(url, headers=headers, timeout=10)
+        if not res.ok:
+            return None
+        raw = res.json().get("result")
+        if not raw or raw == "null":
+            return None
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def _norm_channel(name, mpd, kid, ua):
+    """Canale normalizzato, o None se non e' MPD."""
+    mpd = (mpd or "").strip()
+    if not is_mpd(mpd):
+        return None
+    return {
+        "name": (name or "").strip() or "Senza nome",
+        "mpd": mpd,
+        "key": (kid or "").strip(),
+        "ua": (ua or "").strip(),
+    }
+
+
+def _norm_time(value):
+    """Rende l'orario confrontabile: '2026/09/26 10:55:00 +0000' -> ISO."""
+    if not value:
+        return ""
+    s = str(value).strip().replace("/", "-")
+    for fmt in ("%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S%z",
+                "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(s, fmt).isoformat()
+        except ValueError:
+            continue
+    return s
+
+
+def build_event_pool():
+    """Unisce sportzx_cached e fctv33_cached: 1 evento con tutti i suoi canali MPD.
+
+    Ritorna (pool, stats). Ogni voce del pool:
+      {id, title, category, start, image, sources, channels: [...]}
+    I canali sono deduplicati per kid e, in assenza, per URL del manifest.
+    """
+    pool = {}
+    stats = {"fctv33": 0, "sportzx": 0, "canali": 0, "scartati_non_mpd": 0}
+
+    def touch(eid, title, category, start, image, source):
+        key = eid if eid is not None else f"{_norm_time(start)}|{(title or '').strip().lower()}"
+        item = pool.get(key)
+        if item is None:
+            item = {"id": eid, "title": (title or "").strip() or "Senza titolo",
+                    "category": (category or "").strip() or "Eventi",
+                    "start": start, "image": image, "sources": [], "channels": []}
+            pool[key] = item
+        if source not in item["sources"]:
+            item["sources"].append(source)
+        if not item.get("image") and image:
+            item["image"] = image
+        if not item.get("start") and start:
+            item["start"] = start
+        return item
+
+    def add_channel(item, ch):
+        if ch is None:
+            stats["scartati_non_mpd"] += 1
+            return
+        for c in item["channels"]:
+            if ch["key"] and ch["key"] == c["key"]:
+                if not c["ua"] and ch["ua"]:
+                    c["ua"] = ch["ua"]
+                return
+            if not ch["key"] and ch["mpd"] == c["mpd"]:
+                return
+        item["channels"].append(ch)
+        stats["canali"] += 1
+
+    # Fonte 4: fctv33, gia' nel formato finale (channels[].mpd_url)
+    fct = _upstash_get("fctv33_cached") or {}
+    for ev in (fct.get("events") or []):
+        if not isinstance(ev, dict):
+            continue
+        stats["fctv33"] += 1
+        item = touch(ev.get("id"), ev.get("event_title"), ev.get("category"),
+                     _norm_time(ev.get("startTime")), "", "fctv33")
+        for c in (ev.get("channels") or []):
+            if not isinstance(c, dict):
+                continue
+            add_channel(item, _norm_channel(c.get("name"), c.get("mpd_url"),
+                                            c.get("kid_key"), c.get("user_agent")))
+
+    # Fonte 3: sportzx, formato diverso (decoded_channels[].link con |user-agent=)
+    spz = _upstash_get("sportzx_cached") or []
+    if isinstance(spz, dict):
+        spz = spz.get("events") or []
+    for ev in (spz or []):
+        if not isinstance(ev, dict):
+            continue
+        stats["sportzx"] += 1
+        info = ev.get("eventInfo") or {}
+        item = touch(ev.get("id"), ev.get("title") or info.get("eventName"), ev.get("cat"),
+                     _norm_time(info.get("startTime")), info.get("eventBanner"), "sportzx")
+        for c in (ev.get("decoded_channels") or []):
+            if not isinstance(c, dict):
+                continue
+            mpd, ua = _split_sportzx_link(c.get("link"))
+            add_channel(item, _norm_channel(c.get("title"), mpd, c.get("api"), ua))
+
+    out = [v for v in pool.values() if v["channels"]]
+    out.sort(key=lambda e: (e.get("start") or "9999"))
+    return out, stats
+
+
+def pool_entry(event, channel):
+    """Costruisce l'entry da salvare in eventi estratti per il canale scelto.
+
+    Restituisce None se il canale non e' MPD: cosi' l'endpoint non puo' essere
+    usato per infilare un m3u8/HLS nell'archivio.
+    """
+    mpd = (channel.get("mpd") or "").strip()
+    if not is_mpd(mpd):
+        return None
+    return {
+        "name": (event.get("title") or "").strip() or "Senza titolo",
+        "image": event.get("image") or "",
+        "start": event.get("start") or "",
+        "end": event.get("end") or "",
+        "mpd": mpd,
+        "key": (channel.get("key") or "").strip(),
+        "ua": (channel.get("ua") or "").strip(),
+    }
+
+
 def add_event(comp_title, entry, pid=None, asincrono=False):
     """Aggiunge/sostituisce un evento (dedup per titolo) e salva in locale."""
     data = _load()
