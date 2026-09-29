@@ -1143,6 +1143,38 @@ function showZipSetup(reasonText) {
 
         const renameModal = new bootstrap.Modal(document.getElementById('renameModal'));
 
+        function decodeMpdExp(mpd) {
+            try {
+                const m = (mpd || '').match(/@(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/);
+                if (!m) return null;
+                const payloadB64 = m[1].split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payloadB64), c => c.charCodeAt(0))));
+                return claims.exp ? claims.exp * 1000 : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function tickStreamExpiry() {
+            const now = Date.now();
+            document.querySelectorAll('.stream-exp[data-exp]').forEach((el) => {
+                const exp = parseInt(el.getAttribute('data-exp'), 10);
+                if (isNaN(exp)) return;
+                const span = el.querySelector('.stream-exp-countdown');
+                if (!span) return;
+                const remain = exp - now;
+                if (remain <= 0) {
+                    span.textContent = 'SCADUTO';
+                    el.classList.add('text-danger');
+                } else {
+                    const h = Math.floor(remain / 3600000);
+                    const m = Math.floor((remain % 3600000) / 60000);
+                    const s = Math.floor((remain % 60000) / 1000);
+                    span.textContent = h + 'h ' + String(m).padStart(2, '0') + 'm ' + String(s).padStart(2, '0') + 's';
+                }
+            });
+        }
+
         async function loadExtracted() {
             try {
                 window.__extractedEntries = [];
@@ -1200,6 +1232,7 @@ function showZipSetup(reasonText) {
                     const { comp, idx, extUrl, itemObj } = entryInfo;
                     const mpd = itemObj.mpd;
                     const keys = itemObj.key;
+                    const expMs = decodeMpdExp(mpd);
 
                     // Output JSON per il singolo evento raggruppato (formato fedele a dazn11)
                     const singleGroupedObj = {
@@ -1223,6 +1256,9 @@ function showZipSetup(reasonText) {
                                     </div>
                                 </div>
                                 <div class="badge-extracted mb-2"><i class="fa-solid fa-check me-1"></i>${comp}</div>
+                                <div class="stream-exp small text-muted mt-1 mb-2${expMs ? '' : ' d-none'}" data-exp="${expMs || ''}">
+                                    <i class="fa-solid fa-hourglass-half me-1"></i>Flusso scade tra <span class="stream-exp-countdown fw-semibold">--</span>
+                                </div>
                                 <div class="mt-auto">
                                     <button class="btn btn-outline-mini extracted-copy w-100" onclick='copyEntry(${eidx}, "jsonStr", "JSON copiato!")' title="Copia JSON evento">
                                         <i class="fa-solid fa-code me-1"></i>JSON
@@ -1910,6 +1946,7 @@ function showCopyToast(msg, isError) {
         updateSessionTimer();
         setInterval(tickSessionTimer, 1000);
         setInterval(updateSessionTimer, 30000);
+        setInterval(tickStreamExpiry, 1000);
     </script>
 </body>
 </html>
