@@ -230,6 +230,32 @@ def _tile_image(tile) -> str:
     return _image_url(getattr(tile, "image", ""))
 
 
+def _to_local_time(value: str) -> str:
+    """Converte un orario UTC di DAZN nell'ora italiana.
+
+    DAZN restituisce gli orari in UTC ('2026-09-28T16:00:00Z') ma vengono
+    letti come se fossero gia' locali, quindi risultano indietro di 2 ore in
+    estate e di 1 in inverno. Si converte con il fuso Europe/Rome, che segue
+    l'ora legale: uno scarto fisso sbaglierebbe per metà dell'anno.
+    Restituisce 'YYYY-MM-DDTHH:MM:SS' senza suffisso, come richiesto.
+    """
+    if not value:
+        return value if isinstance(value, str) else ""
+    try:
+        from datetime import datetime, timezone
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo("Europe/Rome")
+        except Exception:
+            tz = timezone.utc
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(tz).strftime("%Y-%m-%dT%H:%M:%S")
+    except Exception:
+        return str(value)
+
+
 _IMAGE_SECTIONS = (
     "epg", "LinearChannels", "Live", "LiveAndNextNew", "Sport", "Catchup",
 )
@@ -1466,12 +1492,18 @@ def extract_stream():
             entry = {
                 "name": event_name,
                 "image": logo,
-                "start": start,
-                "end": end,
+                # DAZN manda gli orari in UTC: si convertono all'ora italiana.
+                "start": _to_local_time(start),
+                "end": _to_local_time(end),
                 "mpd": mpd_auth,
                 "key": keys_str,
                 "ua": ua_str
             }
+            # I canali lineari non hanno un orario di evento: Start/End nei rail
+            # sono date sentinella (2024-05-23, 3000-01-01), quindi si azzerano.
+            if is_linear_chan:
+                entry["start"] = ""
+                entry["end"] = ""
             add_event(competition, entry, _current_pid(), asincrono=True)
             sync_to_github(f"extract: salvato evento {event_name} ({_current_pid()})")
             res["mpd_url"] = mpd_auth
