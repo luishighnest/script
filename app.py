@@ -12,6 +12,19 @@ from flask import Flask, render_template, jsonify, request, Response, session, r
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR))
 
+
+def _upstash_token():
+    """Token Upstash, letto da un file locale coperto da .gitignore.
+
+    Era scritto dentro il codice, quindi chiunque leggesse il repository
+    poteva scrivere e leggere tutto il database. La lettura sta ora in
+    dazn_navigator2/services/secrets_store.py, condivisa con eventi_cmds.
+    Se il file non c'e' si ottiene una stringa vuota: le chiamate Upstash
+    falliranno, ma il resto del sito continuera' a funzionare.
+    """
+    from dazn_navigator2.services.secrets_store import upstash_token
+    return upstash_token()
+
 class _FailoverStream:
     """Stream che non lascia mai propagare un errore di I/O.
 
@@ -167,6 +180,81 @@ _PROFILE_BUSY_UNTIL = 0.0
 # sessione Flask non e' disponibile.
 _LAST_PID = None
 
+# --- Blocco dei tentativi di login ----------------------------------------
+# Senza un limite le password si possono provare all'infinito. Il conteggio
+# e' per indirizzo, ricavato da CF-Connecting-IP (header che imposta
+# cloudflared): dietro il tunnel, senza quell'header, Flask vedrebbe solo
+# 127.0.0.1 e il blocco colpirebbe insieme tutti, quindi in quel caso si
+# ricade sul contatore globale.
+_LOGIN_TENTATIVI = {}   # ip -> [fallimenti, timestamp di sblocco]
+_LOGIN_GLOBALI = []     # timestamp dei fallimenti recenti, a prescindere dall'ip
+_LOGIN_LOCK = threading.Lock()
+_LOGIN_MAX_TENTATIVI = 5        # dopo quanti errori consecutivi si blocca
+_LOGIN_BLOCCO_SEC = 300         # 5 minuti di attesa
+# Rete di sicurezza per attacchi distribuiti su tanti indirizzi. Va tenuta
+# ALTA: e' un tetto globale, quindi quando scatta blocca anche l'utente
+# legittimo. Con 40 fallimenti in 5 minuti bastava a chiunque bloccare
+# l'utente fuori dal sito a ripetizione, ed era un problema peggiore di quello
+# che si voleva prevenire. Il blocco vero e proprio e' quello per IP.
+_LOGIN_MAX_GLOBALI = 150
+
+
+def _login_client_id():
+    """Identifica il visitatore per il blocco dei tentativi.
+
+    Dietro il tunnel cloudflared l'ip reale arriva in CF-Connecting-IP; se
+    l'header manca (per esempio accesso diretto in rete locale) si usa
+    l'indirizzo del socket.
+    """
+    ip = (request.headers.get("CF-Connecting-IP") or "").strip()
+    if not ip:
+        ip = request.remote_addr or "sconosciuto"
+    return ip
+
+
+def _login_bloccato():
+    """True se il visitatore deve aspettare. Restituisce i secondi rimanenti."""
+    import time as _t
+    ora = _t.time()
+    cid = _login_client_id()
+    with _LOGIN_LOCK:
+        # il tetto globale si applica a tutti, cosi' un attaccante non puo'
+        # eluderlo semplicemente ruotando indirizzo
+        _LOGIN_GLOBALI[:] = [x for x in _LOGIN_GLOBALI if ora - x < _LOGIN_BLOCCO_SEC]
+        if len(_LOGIN_GLOBALI) >= _LOGIN_MAX_GLOBALI:
+            return _LOGIN_BLOCCO_SEC
+        dati = _LOGIN_TENTATIVI.get(cid)
+        if not dati:
+            return 0
+        fallimenti, sblocco = dati
+        if sblocco > ora:
+            return int(sblocco - ora)
+        if sblocco:
+            # il blocco e' scaduto: si riparte puliti
+            _LOGIN_TENTATIVI[cid] = [0, 0.0]
+    return 0
+
+
+def _login_registra_fallimento():
+    import time as _t
+    ora = _t.time()
+    cid = _login_client_id()
+    with _LOGIN_LOCK:
+        _LOGIN_GLOBALI.append(ora)
+        dati = _LOGIN_TENTATIVI.get(cid) or [0, 0.0]
+        dati[0] += 1
+        if dati[0] >= _LOGIN_MAX_TENTATIVI:
+            dati[1] = ora + _LOGIN_BLOCCO_SEC
+        _LOGIN_TENTATIVI[cid] = dati
+        return dati[0]
+
+
+def _login_azzera():
+    """Login riuscito: il contatore di quell'indirizzo riparte da zero."""
+    with _LOGIN_LOCK:
+        _LOGIN_TENTATIVI.pop(_login_client_id(), None)
+
+
 def _start_background_loop(loop):
     asyncio.set_event_loop(loop)
     loop.run_forever()
@@ -182,7 +270,39 @@ def run_async(coro, timeout=90):
     return future.result(timeout=timeout)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dazn-secret-auth-key-2026")
+
+
+def _carica_secret_key():
+    """Chiave per firmare i cookie di sessione.
+
+    Prima era una stringa fissa scritta in questo file, che essendo pubblico
+    su GitHub permetteva a chiunque di fabbricare una sessione valida e
+    saltare il login. Ora la chiave e' casuale e vive in un file locale
+    coperto da .gitignore, quindi non e' piu' leggibile dal repository.
+    L'ordine di preferenza e': variabile d'ambiente, poi file locale. Se
+    non esiste, se ne genera una e la si salva, cosi' l'app si avvia sempre
+    e le sessioni sopravvivono ai riavvii.
+    """
+    env = os.environ.get("SECRET_KEY")
+    if env:
+        return env
+    file_chiave = BASE_DIR / ".secret_key"
+    try:
+        if file_chiave.exists():
+            salvata = file_chiave.read_text(encoding="utf-8").strip()
+            if salvata:
+                return salvata
+        import secrets as _secrets
+        nuova = _secrets.token_hex(32)
+        file_chiave.write_text(nuova, encoding="utf-8")
+        return nuova
+    except Exception:
+        # se non si puo' scrivere il file, si usa una chiave di sessione:
+        # le sessioni non sopravvivono al riavvio, ma il sito funziona
+        return _secrets.token_hex(32) if "_secrets" in dir() else os.urandom(32).hex()
+
+
+app.secret_key = _carica_secret_key()
 
 PROFILES_CONFIG_FILE = BASE_DIR / "profiles_config.json"
 UPLOAD_PROFILES_DIR = BASE_DIR / "saved_profiles"
@@ -490,13 +610,29 @@ def home():
 @app.route("/login", methods=["GET", "POST"])
 def login_page():
     if request.method == "POST":
+        attesa = _login_bloccato()
+        if attesa:
+            return render_template(
+                "login.html",
+                error=("Troppi tentativi falliti. Attendi %d secondi e riprova." % attesa)
+            ), 429
         password = request.form.get("password", "").strip()
         if password in PROFILES:
             prof = PROFILES[password]
             session["user_profile_id"] = prof["id"]
             session["user_profile_name"] = prof["name"]
+            _login_azzera()
             return redirect("/script")
-        return render_template("login.html", error="Password non valida. Riprova.")
+        falliti = _login_registra_fallimento()
+        if falliti >= _LOGIN_MAX_TENTATIVI:
+            return render_template(
+                "login.html",
+                error=("Password non valida. Troppi tentativi: attendi %d secondi." % _LOGIN_BLOCCO_SEC)
+            ), 429
+        return render_template(
+            "login.html",
+            error="Password non valida. Riprova. (%d tentativi falliti)" % falliti
+        )
     
     if "user_profile_id" in session:
         return redirect("/script")
@@ -948,7 +1084,7 @@ def get_saved_events():
     try:
         import requests
         url = "https://ace-seal-162556.upstash.io/get/stream:eventi_mpd"
-        headers = {"Authorization": "Bearer gQAAAAAAAnr8AAIgcDEyZjRkYjEwYmUzZDY0M2RhYjZkNjhmMDFjNGVkMjVmYw"}
+        headers = {"Authorization": f"Bearer {_upstash_token()}"}
         res = requests.get(url, headers=headers, timeout=10)
         if res.ok:
             raw = res.json().get("result")
@@ -1187,8 +1323,7 @@ def sync_events_to_next():
         return jsonify({"ok": False, "error": "Nessun evento estratto da sincronizzare"}), 400
 
     upstash_url = "https://ace-seal-162556.upstash.io"
-    upstash_token = "gQAAAAAAAnr8AAIgcDEyZjRkYjEwYmUzZDY0M2RhYjZkNjhmMDFjNGVkMjVmYw"
-    headers = {"Authorization": f"Bearer {upstash_token}"}
+    headers = {"Authorization": f"Bearer {_upstash_token()}"}
     
     try:
         r = requests.get(f"{upstash_url}/get/stream:eventi", headers=headers, timeout=10)
@@ -1458,6 +1593,12 @@ def search_events():
 
 @app.route("/api/diagnose")
 def diagnose():
+    # Questa route restituiva, a CHIUNQUE, anche senza sessione: le chiavi
+    # dell'oggetto di risposta sono i nomi dei profili, che sono anche le
+    # password di login (cfr. /login), piu' i percorsi assoluti del disco e i
+    # device_id dei token. Ora e' chiusa come tutte le altre route dati.
+    if "user_profile_id" not in session:
+        return jsonify({"error": "Non autenticato"}), 401
     import time as _time
     now = _time.time()
     from dazn_navigator2.services.extractor import _CACHED_SERVICES

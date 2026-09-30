@@ -1,18 +1,27 @@
-__pycache__/
+﻿__pycache__/
 *.egg-info/
 *.pyc
 temp_*.zip
 github_token.txt
 worker_url.txt
 .worker_url
-saved_profiles/*/Default/Cache/
-saved_profiles/*/Default/Code Cache/
-saved_profiles/*/Default/GPUCache/
-saved_profiles/*/Default/DawnGraphiteCache/
-saved_profiles/*/Default/DawnWebGPUCache/
-saved_profiles/*/Default/chrome_debug.log
-/chrome_profile/
-saved_profiles/**/chrome_profile/
 flask.log
 
+# Profili Chrome/Edge generati runtime (contenuto sensibile: token, cookie, sessioni)
+saved_profiles/
+chrome_profile/
+/dazn_session.json
+/dazn_event.json
+/auth_token.json
+/profiles_config.json
+/dazn_session.json
+/config.json
+.secret_key
+.secrets.json
 
+# Script WIP locali da NON committare
+dazn_navigator2/auth/token_refresh.py
+
+# File temporanei di debug
+*.log
+.DS_Store

@@ -70,9 +70,9 @@ def _upstash_set(payload):
     """Scrive lo stato su Upstash. Ritorna True/False, non alza mai."""
     try:
         import requests
+        from dazn_navigator2.services.secrets_store import upstash_token
         upstash_url = "https://ace-seal-162556.upstash.io"
-        upstash_token = "gQAAAAAAAnr8AAIgcDEyZjRkYjEwYmUzZDY0M2RhYjZkNjhmMDFjNGVkMjVmYw"
-        headers = {"Authorization": f"Bearer {upstash_token}"}
+        headers = {"Authorization": f"Bearer {upstash_token()}"}
         requests.post(f"{upstash_url}/set/stream:eventi_mpd", headers=headers,
                       data=payload, timeout=10)
         return True
@@ -176,8 +176,9 @@ def _upstash_get(key):
     """Legge una chiave da Upstash. Ritorna None se irraggiungibile o assente."""
     try:
         import requests
+        from dazn_navigator2.services.secrets_store import upstash_token
         url = f"https://ace-seal-162556.upstash.io/get/stream:{key}"
-        headers = {"Authorization": "Bearer gQAAAAAAAnr8AAIgcDEyZjRkYjEwYmUzZDY0M2RhYjZkNjhmMDFjNGVkMjVmYw"}
+        headers = {"Authorization": f"Bearer {upstash_token()}"}
         res = requests.get(url, headers=headers, timeout=10)
         if not res.ok:
             return None
