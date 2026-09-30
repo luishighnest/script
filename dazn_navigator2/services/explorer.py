@@ -1,6 +1,6 @@
 """Navigatore completo del sito DAZN - scopre TUTTE le sezioni e i contenuti dinamicamente."""
 import asyncio
-from typing import List, Dict
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 from dazn_navigator2.api.client import DaznClient, DaznAPIError
 
@@ -32,6 +32,12 @@ class DaznExplorer:
         self.client = DaznClient()
         self._sections: List[RailSection] = []
         self._cached_tiles: Dict[str, List[ContentTile]] = {}
+        # Ultimo errore di API incontrato da get_tiles. get_tiles continua a
+        # restituire [] per compatibilita' (diversi chiamanti si appoggiano a
+        # questo comportamento), ma senza questo campo non si distingue "DAZN
+        # risponde e non c'e' niente in onda" da "DAZN ha risposto con un
+        # errore": sono due situazioni opposte che finivano identiche.
+        self.last_error: Optional[str] = None
 
     async def discover_all(self) -> List[RailSection]:
         sections = {}
@@ -294,8 +300,14 @@ class DaznExplorer:
                 )
                 items.append(ct)
             self._cached_tiles[section_id] = items
+            self.last_error = None
             return items
-        except DaznAPIError:
+        except DaznAPIError as e:
+            # Non propagare: alcuni chiamanti (VOD, self-healing, diagnosi)
+            # trattano [] come "niente trovato" e non vogliono eccezioni.
+            # L'errore vero resta pero' disponibile in last_error, cosi' le
+            # route che devono distinguere possono farlo.
+            self.last_error = str(e)
             return []
 
     async def get_vod_categories(self) -> dict:

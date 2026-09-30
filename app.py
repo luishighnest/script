@@ -1328,11 +1328,18 @@ def get_live_events():
         explorer = DaznExplorer()
         tiles = await explorer.get_tiles("Live")
         items = [_format_tile_item(t) for t in tiles]
+        # get_tiles restituisce [] sia quando DAZN risponde e non c'e' niente
+        # in onda, sia quando DAZN ha risposto con un errore. Sono due
+        # situazioni opposte: la prima e' normale e non deve sembrare un
+        # guasto, la seconda va segnalata come tale.
+        err = getattr(explorer, "last_error", None)
         await explorer.close()
-        return items
+        return items, err
 
     try:
-        data = run_async(_fetch(), timeout=45)
+        data, err = run_async(_fetch(), timeout=45)
+        if err and not data:
+            return jsonify({"error": f"DAZN ha risposto con un errore: {err}"}), 502
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

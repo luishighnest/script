@@ -1530,15 +1530,27 @@ function showZipSetup(reasonText) {
             showCopyToast('Dati aggiornati!', false);
         }
 
-        function showRetry(container, label, retryFn) {
+        function showRetry(container, label, retryFn, detail) {
             container.innerHTML = `
                 <div class="col-12 text-center py-5">
-                    <i class="fa-solid fa-tower-broadcast fa-3x text-muted mb-3"></i>
-                    <p class="text-muted mb-3">${label}: DAZN non raggiungibile in questo momento.</p>
+                    <i class="fa-solid fa-triangle-exclamation fa-3x text-muted mb-3"></i>
+                    <p class="text-muted mb-2">${label}: non riesco a leggere i dati da DAZN.</p>
+                    ${detail ? `<p class="text-danger small mb-3" style="word-break:break-word;">${detail}</p>` : ''}
                     <button class="btn btn-dazn btn-sm" id="btn-retry-content"><i class="fa-solid fa-rotate-right me-1"></i>Riprova</button>
                 </div>`;
             const btn = container.querySelector('#btn-retry-content');
             if (btn) btn.onclick = retryFn;
+        }
+
+        // DAZN risponde ma non c'e' niente in onda: NON e' un errore, non
+        // metto il pulsante "Riprova" perche' aspettare non cambierebbe nulla.
+        function showEmpty(container, label) {
+            container.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <i class="fa-solid fa-calendar-xmark fa-3x text-muted mb-3"></i>
+                    <p class="text-muted mb-0">${label}: nessun evento in questo momento.</p>
+                    <p class="text-muted small mt-2 mb-0">DAZN ha risposto correttamente, non c'e' proprio niente da trasmettere.</p>
+                </div>`;
         }
 
         function preloadSections() {
@@ -1804,14 +1816,23 @@ function showZipSetup(reasonText) {
             try {
                 const res = await fetch('/api/live');
                 const tiles = await res.json();
-                if (!res.ok || tiles.error || !cacheableContents(tiles)) {
-                    showRetry(container, 'Eventi live', () => loadLive());
+                if (!res.ok || tiles.error) {
+                    showRetry(container, 'Eventi live', () => loadLive(), tiles.error || ('HTTP ' + res.status));
+                    return;
+                }
+                if (Array.isArray(tiles) && tiles.length === 0) {
+                    // DAZN ha risposto e non c'e' niente in onda: non e' un guasto.
+                    showEmpty(container, 'Eventi live');
+                    return;
+                }
+                if (!cacheableContents(tiles)) {
+                    showEmpty(container, 'Eventi live');
                     return;
                 }
                 ctCache.live = { ts: Date.now(), data: tiles };
                 renderTileGrid(tiles, container, 'live');
             } catch (err) {
-                showRetry(container, 'Eventi live', () => loadLive());
+                showRetry(container, 'Eventi live', () => loadLive(), err.message);
             }
         }
 
