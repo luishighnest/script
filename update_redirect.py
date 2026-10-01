@@ -92,7 +92,7 @@ a:hover {{ text-decoration: underline; }}
 def update_github_repo_homepage(token: str, link: str) -> bool:
     """Aggiorna la homepage del repo GitHub tramite API (immediata, zero secondi di attesa)."""
     try:
-        url = "https://api.github.com/repos/luishighnest/script2"
+        url = "https://api.github.com/repos/luishighnest/script"
         data = json.dumps({"homepage": link}).encode("utf-8")
         req = urllib.request.Request(
             url,
@@ -132,7 +132,7 @@ def main():
     # 2. Aggiorna index.html per la copia statica di riserva
     INDEX.write_text(TEMPLATE.format(link=link), encoding="utf-8")
 
-    repo_url = f"https://x-access-token:{token}@github.com/luishighnest/script2.git"
+    repo_url = f"https://x-access-token:{token}@github.com/luishighnest/script.git"
     no_win = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
     try:
         subprocess.run(["git", "config", "user.name", "Render Auto-Sync"], cwd=str(BASE_DIR), check=True, creationflags=no_win, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
